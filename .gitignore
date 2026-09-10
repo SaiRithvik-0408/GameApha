@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.vite/
+flutter_version/.dart_tool/
+flutter_version/build/
+unity_version/Library/
+unity_version/Temp/
+unity_version/Logs/
+unity_version/UserSettings/
+.DS_Store
