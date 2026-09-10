@@ -1,0 +1,44 @@
+name: Build Web & Android APK
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Build Web Game
+        run: |
+          npm ci
+          npx vite build --base=/GameApha/
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Build Android APK
+        run: |
+          cd flutter_version
+          flutter pub get
+          flutter build apk --release
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: BusFeverParty-Android-APK
+          path: flutter_version/build/app/outputs/flutter-apk/app-release.apk
