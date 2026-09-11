@@ -6,7 +6,7 @@ export const GRID_START_X = -((GRID_SIZE * CELL_SIZE) / 2) + CELL_SIZE / 2;
 
 // Track last generated layout hash to ensure restarts produce different layouts
 let lastLayoutHash = '';
-export const GRID_START_Z = -((GRID_SIZE * CELL_SIZE) / 2) + CELL_SIZE / 2 + 1.5;
+export const GRID_START_Z = -((GRID_SIZE * CELL_SIZE) / 2) + CELL_SIZE / 2 + 3.5;
 
 export function gridToWorld(r, c, len = 2, isVert = false) {
   const x = GRID_START_X + (isVert ? c : c + (len - 1) / 2) * CELL_SIZE;

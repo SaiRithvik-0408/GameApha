@@ -51,7 +51,7 @@ function getTotalActiveSlots() {
 function getDockWorldPos(slotIndex, totalSlots) {
   const startX = -4.8;
   const stepX = 1.6;
-  return { x: startX + slotIndex * stepX, y: 0.15, z: -4.2 };
+  return { x: startX + slotIndex * stepX, y: 0.15, z: -2.2 };
 }
 
 function initUI() {
@@ -195,7 +195,7 @@ function update3DPassengerQueue() {
     const radiusX = 5.8;
     const radiusZ = 3.2;
     const x = Math.cos(angle) * radiusX;
-    const z = -9.8 + Math.sin(angle) * radiusZ;
+    const z = -10.8 + Math.sin(angle) * radiusZ;
 
     pMesh.position.set(x, 0.3, z);
     pMesh.rotation.y = angle + Math.PI / 2;
@@ -215,7 +215,7 @@ function update3DPassengerQueue() {
     const radiusX = 7.2;
     const radiusZ = 3.8;
     const x = Math.cos(angle) * radiusX;
-    const z = -12.5 + Math.sin(angle) * radiusZ;
+    const z = -13.5 + Math.sin(angle) * radiusZ;
 
     pMesh.position.set(x, 0.3, z);
     pMesh.rotation.y = angle + Math.PI / 2;
@@ -383,8 +383,8 @@ function moveBusToStation3D(bus) {
   let exitTargetX = busMesh.position.x;
   let exitTargetZ = busMesh.position.z;
 
-  if (bus.dir === 'UP') exitTargetZ = -3.8;
-  else if (bus.dir === 'DOWN') exitTargetZ = 7.5;
+  if (bus.dir === 'UP') exitTargetZ = -1.8;
+  else if (bus.dir === 'DOWN') exitTargetZ = 9.5;
   else if (bus.dir === 'LEFT') exitTargetX = -8.5;
   else if (bus.dir === 'RIGHT') exitTargetX = 8.5;
 
