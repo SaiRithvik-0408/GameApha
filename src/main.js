@@ -17,7 +17,7 @@ import {
 // Game State
 let currentLevel = 1;
 let score = 0;
-let coins = 100;
+let coins = 150;
 let adBonusSlots = 0; // max 2 extra slots
 
 let boardingLane = []; // active buses docked at station
@@ -36,38 +36,37 @@ function getTotalActiveSlots() {
   return getBaseSlotsForLevel(currentLevel) + adBonusSlots;
 }
 
-// Map Dock Slot index (0..5) to 3D World X, Z positions on Station Platform
+// Map Dock Slot index (0..5) to 3D World X, Z positions on Station Platform (matching reference image)
 function getDockWorldPos(slotIndex, totalSlots) {
-  const totalWidth = 10;
-  const startX = -totalWidth / 2 + totalWidth / (totalSlots * 2);
-  const xStep = totalWidth / totalSlots;
+  const startX = -4.5;
+  const stepX = 1.8;
   return {
-    x: startX + slotIndex * xStep,
+    x: startX + slotIndex * stepX,
     y: 0.15,
-    z: -6
+    z: -4.2
   };
 }
 
 function initUI() {
   const app = document.getElementById('app');
   app.innerHTML = `
+    <!-- Top Minimal Action Header -->
     <header class="game-header">
-      <div class="level-badge" id="levelDisplay">LEVEL 1</div>
+      <button class="icon-btn-round" id="btnTopRestart" title="Restart Level">🔄</button>
+      <div class="level-pill" id="levelDisplay">Level 1</div>
       <div class="stats-group">
-        <div class="stat-pill score-pill">⚡ <span id="scoreDisplay">0</span></div>
-        <div class="stat-pill coin-pill">🪙 <span id="coinsDisplay">100</span></div>
+        <div class="stat-pill coin-pill">🪙 <span id="coinsDisplay">150</span></div>
       </div>
     </header>
 
-    <main class="game-viewport" id="viewportContainer">
-      <!-- 3D Canvas Container -->
-    </main>
+    <!-- 3D Canvas Viewport -->
+    <main class="game-viewport" id="viewportContainer"></main>
 
-    <!-- Overlay UI for Docks & Passengers -->
+    <!-- UI Overlay for Passenger Queue & Dock Status -->
     <div class="ui-overlay">
       <section class="queue-container">
         <div class="queue-header">
-          <span>👥 Boarding Queue</span>
+          <span>👥 Crowd Queue</span>
           <span class="badge" id="queueCount">0 Passengers</span>
         </div>
         <div class="passenger-lane" id="passengerLane"></div>
@@ -75,30 +74,35 @@ function initUI() {
 
       <section class="boarding-station-ui">
         <div class="queue-header">
-          <span>🚌 Active Boarding Docks</span>
-          <span class="badge" id="dockCapacityLabel">3 Active Slots</span>
+          <span>🚌 Parking Bays</span>
+          <span class="badge" id="dockCapacityLabel">3 Active Docks</span>
         </div>
         <div class="station-slots" id="stationSlots"></div>
       </section>
     </div>
 
+    <!-- Bottom Booster Bar matching Reference Image -->
     <footer class="booster-bar">
-      <button class="booster-btn" id="btnShuffle">
-        <span class="icon">🔄</span>
-        <span>Shuffle</span>
-        <span class="cost">🪙20</span>
+      <button class="booster-card" id="btnVIP">
+        <div class="booster-icon-wrap">🚗</div>
+        <div class="booster-label">VIP Clear</div>
+        <div class="booster-cost">🪙30</div>
       </button>
-      <button class="booster-btn" id="btnVIP">
-        <span class="icon">⭐</span>
-        <span>VIP Clear</span>
-        <span class="cost">🪙30</span>
+
+      <button class="booster-card" id="btnShuffle">
+        <div class="booster-icon-wrap">🔄</div>
+        <div class="booster-label">Shuffle</div>
+        <div class="booster-cost">🪙20</div>
       </button>
-      <button class="booster-btn" id="btnRestart">
-        <span class="icon">🔁</span>
-        <span>Restart</span>
+
+      <button class="booster-card" id="btnAutoClear">
+        <div class="booster-icon-wrap">🎨</div>
+        <div class="booster-label">Jumbo</div>
+        <div class="booster-cost">🪙40</div>
       </button>
     </footer>
 
+    <!-- Game Over & Win Modal -->
     <div class="modal-overlay" id="gameModal">
       <div class="modal-card">
         <div class="modal-icon" id="modalIcon">🎉</div>
@@ -115,9 +119,10 @@ function initUI() {
   // Touch & Click listeners on 3D viewport
   container.addEventListener('pointerdown', handlePointerDown);
 
+  document.getElementById('btnTopRestart').addEventListener('click', () => startLevel(currentLevel));
   document.getElementById('btnShuffle').addEventListener('click', handleShuffleQueue);
   document.getElementById('btnVIP').addEventListener('click', handleVIPClear);
-  document.getElementById('btnRestart').addEventListener('click', () => startLevel(currentLevel));
+  document.getElementById('btnAutoClear').addEventListener('click', handleAutoClear);
   document.getElementById('modalBtn').addEventListener('click', handleModalBtnClick);
 
   startLevel(1);
@@ -126,13 +131,14 @@ function initUI() {
 
 function startLevel(lvl) {
   currentLevel = lvl;
-  document.getElementById('levelDisplay').textContent = `LEVEL ${currentLevel}`;
+  document.getElementById('levelDisplay').textContent = `Level ${currentLevel}`;
   document.getElementById('gameModal').classList.remove('active');
 
-  // Clear existing 3D objects
+  // Clear existing 3D bus objects
   bus3DMap.forEach(group => sceneManager.scene.remove(group));
   bus3DMap.clear();
 
+  // Clear existing 3D passenger queue objects
   passenger3DQueue.forEach(pMesh => sceneManager.scene.remove(pMesh));
   passenger3DQueue = [];
 
@@ -163,11 +169,15 @@ function update3DPassengerQueue() {
   passenger3DQueue.forEach(pMesh => sceneManager.scene.remove(pMesh));
   passenger3DQueue = [];
 
-  const visibleQueue = passengers.slice(0, 10);
+  const visibleQueue = passengers.slice(0, 14);
   visibleQueue.forEach((color, idx) => {
     const pMesh = createPassenger3D(color);
-    const x = -5 + idx * 0.7;
-    const z = -4.5;
+    const angle = (idx / 14) * Math.PI;
+    const radiusX = 5.5;
+    const radiusZ = 3.2;
+    const x = Math.cos(angle) * radiusX;
+    const z = -10 + Math.sin(angle) * radiusZ;
+
     pMesh.position.set(x, 0.3, z);
     pMesh.rotation.y = Math.PI / 2;
     sceneManager.scene.add(pMesh);
@@ -264,7 +274,7 @@ function moveBusToStation3D(bus) {
   let exitTargetX = busMesh.position.x;
   let exitTargetZ = busMesh.position.z;
 
-  if (bus.dir === 'UP') exitTargetZ = -5;
+  if (bus.dir === 'UP') exitTargetZ = -3.5;
   else if (bus.dir === 'DOWN') exitTargetZ = 7;
   else if (bus.dir === 'LEFT') exitTargetX = -8;
   else if (bus.dir === 'RIGHT') exitTargetX = 8;
@@ -300,12 +310,14 @@ function moveBusToStation3D(bus) {
   });
 
   renderUI();
-  processBoarding(); // Start checking boarding right away
+  processBoarding(); // Check boarding immediately
 }
 
 function processBoarding() {
-  if (passengers.length === 0 && boardingLane.length === 0 && gridBuses.every(b => b.state === 'EXITING')) {
-    setTimeout(triggerWin, 600);
+  const activeBuses = gridBuses.filter(b => b.state !== 'EXITING');
+
+  if (passengers.length === 0 && boardingLane.length === 0 && activeBuses.length === 0) {
+    setTimeout(triggerWin, 500);
     return;
   }
 
@@ -337,11 +349,11 @@ function processBoarding() {
         score += 50;
         coins += 5;
 
-        setTimeout(() => animateBusExit3D(targetBus), 400);
+        setTimeout(() => animateBusExit3D(targetBus), 350);
       }
 
       // Schedule next boarding pass for continuous flow
-      setTimeout(processBoarding, 200);
+      setTimeout(processBoarding, 180);
       break;
     }
   }
@@ -349,7 +361,14 @@ function processBoarding() {
   update3DPassengerQueue();
   renderUI();
 
-  // Game over check
+  // Check win condition
+  const remainingActiveBuses = gridBuses.filter(b => b.state !== 'EXITING');
+  if (passengers.length === 0 && boardingLane.length === 0 && remainingActiveBuses.length === 0) {
+    setTimeout(triggerWin, 600);
+    return;
+  }
+
+  // Check game over condition
   const activeSlots = getTotalActiveSlots();
   if (boardingLane.length >= activeSlots && passengers.length > 0) {
     const canBoardNext = passengers.some(pColor =>
@@ -359,34 +378,28 @@ function processBoarding() {
       setTimeout(triggerGameOver, 900);
     }
   }
-
-  if (gridBuses.every(b => b.state === 'EXITING') && passengers.length === 0) {
-    setTimeout(triggerWin, 600);
-  }
 }
 
 function animatePassengerBoarding3D(colorKey, targetBus) {
   const pMesh = createPassenger3D(colorKey);
-  const startX = -5;
-  const startZ = -4.5;
-  pMesh.position.set(startX, 0.3, startZ);
+  pMesh.position.set(0, 0.3, -9.5);
   sceneManager.scene.add(pMesh);
 
   const busMesh = bus3DMap.get(targetBus.id);
   const endX = busMesh ? busMesh.position.x : 0;
-  const endZ = busMesh ? busMesh.position.z : -6;
+  const endZ = busMesh ? busMesh.position.z : -4.2;
 
   // Animate 3D passenger walking & hopping into the bus door
   const timeline = gsap.timeline();
   timeline.to(pMesh.position, {
     x: endX,
     z: endZ,
-    duration: 0.3,
+    duration: 0.28,
     ease: 'power1.out'
   });
   timeline.to(pMesh.position, {
-    y: 1.2,
-    duration: 0.15,
+    y: 1.1,
+    duration: 0.14,
     yoyo: true,
     repeat: 1
   }, 0);
@@ -394,7 +407,7 @@ function animatePassengerBoarding3D(colorKey, targetBus) {
     x: 0,
     y: 0,
     z: 0,
-    duration: 0.15,
+    duration: 0.14,
     onComplete: () => {
       sceneManager.scene.remove(pMesh);
       if (busMesh && busMesh.userData.updateCapacity) {
@@ -413,7 +426,7 @@ function animateBusExit3D(bus) {
   gsap.to(busMesh.position, {
     x: busMesh.position.x + (Math.random() > 0.5 ? 18 : -18),
     z: busMesh.position.z - 5,
-    duration: 0.7,
+    duration: 0.65,
     ease: 'power3.in',
     onComplete: () => {
       sceneManager.scene.remove(busMesh);
@@ -475,14 +488,26 @@ function handleVIPClear() {
   setTimeout(() => animateBusExit3D(targetBus), 200);
 }
 
+function handleAutoClear() {
+  sounds.init();
+  if (coins < 40) return;
+
+  const clickableBus = gridBuses.find(b => b.state === 'GRID' && canBusExitGrid(b, gridBuses));
+  if (clickableBus) {
+    coins -= 40;
+    sounds.playBooster();
+    moveBusToStation3D(clickableBus);
+  }
+}
+
 function watchAdToUnlockSlot() {
   sounds.init();
   if (adBonusSlots >= 2) return;
 
   const modal = document.getElementById('gameModal');
   document.getElementById('modalIcon').textContent = '📺';
-  document.getElementById('modalTitle').textContent = 'UNLOCKING SLOT...';
-  document.getElementById('modalSubtitle').textContent = 'Watching Ad to get +1 Extra Boarding Dock!';
+  document.getElementById('modalTitle').textContent = 'UNLOCKING DOCK...';
+  document.getElementById('modalSubtitle').textContent = 'Unlocking +1 Extra Boarding Dock!';
   document.getElementById('modalBtn').style.display = 'none';
   modal.classList.add('active');
 
@@ -490,18 +515,18 @@ function watchAdToUnlockSlot() {
     adBonusSlots++;
     sounds.playWin();
     document.getElementById('modalIcon').textContent = '🎉';
-    document.getElementById('modalTitle').textContent = 'SLOT UNLOCKED!';
+    document.getElementById('modalTitle').textContent = 'DOCK UNLOCKED!';
     document.getElementById('modalSubtitle').textContent = `Now you have ${getTotalActiveSlots()} active boarding docks!`;
     document.getElementById('modalBtn').style.display = 'inline-block';
     document.getElementById('modalBtn').textContent = 'CONTINUE PLAYING';
     realignDockedBuses3D();
     renderUI();
-  }, 1400);
+  }, 1200);
 }
 
 function triggerWin() {
   sounds.playWin();
-  confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+  confetti({ particleCount: 160, spread: 90, origin: { y: 0.5 } });
 
   const modal = document.getElementById('gameModal');
   document.getElementById('modalIcon').textContent = '🏆';
@@ -532,7 +557,6 @@ function handleModalBtnClick() {
 }
 
 function renderUI() {
-  document.getElementById('scoreDisplay').textContent = score;
   document.getElementById('coinsDisplay').textContent = coins;
   document.getElementById('queueCount').textContent = `${passengers.length} Passengers`;
 
@@ -542,7 +566,7 @@ function renderUI() {
   // Render Queue UI Avatars
   const lane = document.getElementById('passengerLane');
   lane.innerHTML = '';
-  passengers.slice(0, 12).forEach((color, idx) => {
+  passengers.slice(0, 14).forEach((color, idx) => {
     const avatar = document.createElement('div');
     avatar.className = `passenger-avatar ${idx === 0 ? 'first-in-line' : ''}`;
     avatar.style.backgroundColor = BUS_COLORS[color] ? '#' + BUS_COLORS[color].toString(16).padStart(6, '0') : '#3b82f6';
@@ -579,7 +603,7 @@ function renderUI() {
           </div>
         `;
       } else {
-        slot.innerHTML = `<span class="slot-empty-label">EMPTY DOCK</span>`;
+        slot.innerHTML = `<span class="slot-empty-label">${i === 0 ? 'VIP' : 'DOCK'}</span>`;
       }
     } else {
       slot.classList.add('locked');
@@ -598,20 +622,11 @@ function renderUI() {
 function animate() {
   requestAnimationFrame(animate);
 
-  // Micro-animations for 3D objects
   const time = clock.getElapsedTime();
 
-  // Floating Roof Arrows on Buses
-  bus3DMap.forEach((group) => {
-    if (group.userData && group.userData.arrowGroup) {
-      group.userData.arrowGroup.position.y = 1.3 + Math.sin(time * 4) * 0.08;
-      group.userData.arrowGroup.rotation.z = time * 2;
-    }
-  });
-
-  // Bobbing 3D Passengers
+  // Micro-bobbing 3D Passengers in queue
   passenger3DQueue.forEach((pMesh, idx) => {
-    pMesh.position.y = 0.3 + Math.abs(Math.sin(time * 3 + idx * 0.5)) * 0.08;
+    pMesh.position.y = 0.3 + Math.abs(Math.sin(time * 3 + idx * 0.4)) * 0.08;
   });
 
   sceneManager.render();

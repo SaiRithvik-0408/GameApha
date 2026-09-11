@@ -11,14 +11,14 @@ export class GameScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.15;
 
     container.appendChild(this.renderer.domElement);
 
     // 2. Scene & Camera Setup
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x0f172a); // Dark sleek background
-    this.scene.fog = new THREE.FogExp2(0x0f172a, 0.025);
+    this.scene.background = new THREE.Color(0xdbeafe); // Bright daylight background sky
+    this.scene.fog = new THREE.FogExp2(0xdbeafe, 0.015);
 
     this.camera = new THREE.PerspectiveCamera(
       45,
@@ -27,30 +27,30 @@ export class GameScene {
       100
     );
 
-    // Position Camera for isometric top-down gameplay view
-    this.camera.position.set(0, 15, 14);
-    this.camera.lookAt(0, -0.5, -1);
+    // Position Camera for top-down isometric gameplay view matching reference images
+    this.camera.position.set(0, 18, 15);
+    this.camera.lookAt(0, -0.5, 0.5);
 
     // 3. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
     this.scene.add(ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xfff5ea, 1.4);
-    dirLight.position.set(12, 22, 10);
+    const dirLight = new THREE.DirectionalLight(0xfffaed, 1.5);
+    dirLight.position.set(15, 25, 12);
     dirLight.castShadow = true;
     dirLight.shadow.mapSize.width = 2048;
     dirLight.shadow.mapSize.height = 2048;
     dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 50;
-    dirLight.shadow.camera.left = -12;
-    dirLight.shadow.camera.right = 12;
-    dirLight.shadow.camera.top = 12;
-    dirLight.shadow.camera.bottom = -12;
+    dirLight.shadow.camera.far = 60;
+    dirLight.shadow.camera.left = -15;
+    dirLight.shadow.camera.right = 15;
+    dirLight.shadow.camera.top = 15;
+    dirLight.shadow.camera.bottom = -15;
     dirLight.shadow.bias = -0.0005;
     this.scene.add(dirLight);
 
     const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.4);
-    fillLight.position.set(-10, 10, -10);
+    fillLight.position.set(-12, 12, -12);
     this.scene.add(fillLight);
 
     // Raycaster for touch/click interaction
@@ -63,11 +63,11 @@ export class GameScene {
   }
 
   initEnvironment() {
-    // 1. Main Parking Ground (Asphalt Floor)
-    const groundGeo = new THREE.PlaneGeometry(30, 30);
+    // 1. Main Asphalt Ground
+    const groundGeo = new THREE.PlaneGeometry(40, 40);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.8,
+      color: 0x94a3b8, // Clean light grey pavement like reference image
+      roughness: 0.7,
       metalness: 0.1
     });
     const ground = new THREE.Mesh(groundGeo, groundMat);
@@ -76,75 +76,95 @@ export class GameScene {
     ground.receiveShadow = true;
     this.scene.add(ground);
 
-    // 2. 6x6 Grid Base Platform
-    const gridGeo = new THREE.BoxGeometry(11, 0.1, 11);
+    // 2. Upper Grass & Park Terrain (Top Section matching Reference Image)
+    const grassGeo = new THREE.PlaneGeometry(40, 12);
+    const grassMat = new THREE.MeshStandardMaterial({
+      color: 0x86efac, // Bright park green grass
+      roughness: 0.9
+    });
+    const grass = new THREE.Mesh(grassGeo, grassMat);
+    grass.rotation.x = -Math.PI / 2;
+    grass.position.set(0, 0.02, -10);
+    grass.receiveShadow = true;
+    this.scene.add(grass);
+
+    // Curved Winding Pedestrian Pathway on Top Grass
+    const pathCurve = new THREE.EllipseCurve(
+      0, -10,            // ax, aY
+      6, 3.5,            // xRadius, yRadius
+      0, Math.PI,        // aStartAngle, aEndAngle
+      false,             // aClockwise
+      0                  // aRotation
+    );
+
+    const points = pathCurve.getPoints(50);
+    const pathGeo = new THREE.BufferGeometry().setFromPoints(
+      points.map(p => new THREE.Vector3(p.x, 0.04, p.y))
+    );
+    const pathMat = new THREE.LineBasicMaterial({ color: 0xfef08a, linewidth: 8 }); // Yellow path outline
+    const pathLine = new THREE.Line(pathGeo, pathMat);
+    this.scene.add(pathLine);
+
+    // 3. Grid Base Platform (Lower Section)
+    const gridGeo = new THREE.BoxGeometry(11.5, 0.08, 11.5);
     const gridMat = new THREE.MeshStandardMaterial({
-      color: 0x334155,
-      roughness: 0.5,
-      metalness: 0.2
+      color: 0xe2e8f0,
+      roughness: 0.6
     });
     const gridBase = new THREE.Mesh(gridGeo, gridMat);
-    gridBase.position.set(0, 0.05, 1);
+    gridBase.position.set(0, 0.04, 1.5);
     gridBase.receiveShadow = true;
     this.scene.add(gridBase);
 
-    // Grid Cell Lines
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.5 });
+    // Subtle Grid Tile Lines
+    const lineMat = new THREE.LineBasicMaterial({ color: 0xcbd5e6, transparent: true, opacity: 0.4 });
     const gridSize = 6;
     const cellSize = 1.8;
-    const startX = -((gridSize * cellSize) / 2) + cellSize / 2;
-    const startZ = -((gridSize * cellSize) / 2) + cellSize / 2 + 1;
 
     for (let r = 0; r <= gridSize; r++) {
-      const points = [];
-      const z = -((gridSize * cellSize) / 2) + r * cellSize + 1;
-      points.push(new THREE.Vector3(-gridSize * cellSize / 2, 0.11, z));
-      points.push(new THREE.Vector3(gridSize * cellSize / 2, 0.11, z));
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-      const line = new THREE.Line(lineGeo, lineMat);
+      const pts = [];
+      const z = -((gridSize * cellSize) / 2) + r * cellSize + 1.5;
+      pts.push(new THREE.Vector3(-gridSize * cellSize / 2, 0.09, z));
+      pts.push(new THREE.Vector3(gridSize * cellSize / 2, 0.09, z));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
       this.scene.add(line);
     }
 
     for (let c = 0; c <= gridSize; c++) {
-      const points = [];
+      const pts = [];
       const x = -((gridSize * cellSize) / 2) + c * cellSize;
-      points.push(new THREE.Vector3(x, 0.11, -gridSize * cellSize / 2 + 1));
-      points.push(new THREE.Vector3(x, 0.11, gridSize * cellSize / 2 + 1));
-      const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-      const line = new THREE.Line(lineGeo, lineMat);
+      pts.push(new THREE.Vector3(x, 0.09, -gridSize * cellSize / 2 + 1.5));
+      pts.push(new THREE.Vector3(x, 0.09, gridSize * cellSize / 2 + 1.5));
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
       this.scene.add(line);
     }
 
-    // 3. Passenger Station Boarding Platform (Top Front)
-    const platformGeo = new THREE.BoxGeometry(13, 0.3, 3);
-    const platformMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      roughness: 0.3,
-      metalness: 0.2
-    });
-    const platform = new THREE.Mesh(platformGeo, platformMat);
-    platform.position.set(0, 0.15, -6);
-    platform.receiveShadow = true;
-    platform.castShadow = true;
-    this.scene.add(platform);
+    // 4. Angled Parking Slot Outlines on Asphalt Roadway (Matching Reference Image)
+    const numDocks = 6;
+    const dockWidth = 1.8;
+    const startDockX = -4.5;
+    const dockZ = -4.2;
 
-    // Decorative Canopy Roof
-    const canopyGeo = new THREE.BoxGeometry(13.4, 0.2, 3.4);
-    const canopyMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, roughness: 0.2 });
-    const canopy = new THREE.Mesh(canopyGeo, canopyMat);
-    canopy.position.set(0, 3.5, -6);
-    canopy.castShadow = true;
-    this.scene.add(canopy);
+    for (let i = 0; i < numDocks; i++) {
+      const slotX = startDockX + i * dockWidth;
 
-    // Pillars supporting canopy
-    const pillarGeo = new THREE.CylinderGeometry(0.12, 0.12, 3.2, 16);
-    const pillarMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
-    [-6, 6].forEach(px => {
-      const pillar = new THREE.Mesh(pillarGeo, pillarMat);
-      pillar.position.set(px, 1.75, -6);
-      pillar.castShadow = true;
-      this.scene.add(pillar);
-    });
+      // Draw angled yellow/white slot boundary rectangle
+      const slotRectGeo = new THREE.PlaneGeometry(1.5, 2.6);
+      const isVIP = i === 0;
+      const slotRectMat = new THREE.MeshStandardMaterial({
+        color: isVIP ? 0xfacc15 : 0x64748b, // Yellow for VIP, grey/white for standard
+        roughness: 0.5,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide
+      });
+      const slotMesh = new THREE.Mesh(slotRectGeo, slotRectMat);
+      slotMesh.rotation.x = -Math.PI / 2;
+      slotMesh.rotation.z = Math.PI / 12; // Slight diagonal angle matching reference image
+      slotMesh.position.set(slotX, 0.03, dockZ);
+      slotMesh.receiveShadow = true;
+      this.scene.add(slotMesh);
+    }
   }
 
   onWindowResize() {
