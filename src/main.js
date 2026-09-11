@@ -28,8 +28,21 @@ let gridBuses = [];       // bus state objects
 
 let sceneManager;
 let bus3DMap = new Map();
-let passenger3DQueue = [];
+let passenger3DQueue = [];      // 3D meshes for active line
+let waitingLine3DQueue = [];    // 3D meshes for waiting line (clickable)
 let isBoardingInProgress = false;
+
+// Pick from waiting line charges
+let freePicks = 3;     // 3 free picks per level
+let videoPicks = 0;    // 2 unlockable via watching a video ad
+let coinPicks = 0;     // 1 unlockable via spending coins
+const VIDEO_PICKS_MAX = 2;
+const COIN_PICKS_MAX = 1;
+const COIN_PICK_COST = 25;
+
+function getTotalPicks() {
+  return freePicks + videoPicks + coinPicks;
+}
 
 function getTotalActiveSlots() {
   return getBaseSlotsForLevel(currentLevel) + adBonusSlots;
@@ -56,6 +69,16 @@ function initUI() {
 
     <div class="ui-overlay">
       <div class="dock-badge-bar" id="dockCapacityLabel">4 Active Docks</div>
+    </div>
+
+    <!-- Pick from Waiting Line Panel -->
+    <div class="pick-panel" id="pickPanel">
+      <div class="pick-info">
+        <span class="pick-label">✋ Pick:</span>
+        <span class="pick-count" id="pickCount">3</span>
+      </div>
+      <button class="pick-btn video-btn" id="btnVideoPick">🎬 +2 Free</button>
+      <button class="pick-btn coin-btn" id="btnCoinPick">🪙 +1 (25)</button>
     </div>
 
     <footer class="booster-bar">
@@ -95,6 +118,8 @@ function initUI() {
   document.getElementById('btnVIP').addEventListener('click', handleVIPClear);
   document.getElementById('btnAutoClear').addEventListener('click', handleAutoClear);
   document.getElementById('modalBtn').addEventListener('click', handleModalBtnClick);
+  document.getElementById('btnVideoPick').addEventListener('click', handleVideoPickUnlock);
+  document.getElementById('btnCoinPick').addEventListener('click', handleCoinPickUnlock);
 
   startLevel(1);
   animate();
@@ -112,6 +137,11 @@ function startLevel(lvl) {
   passenger3DQueue = [];
   boardingLane = [];
   isBoardingInProgress = false;
+
+  // Reset pick charges each level
+  freePicks = 3;
+  videoPicks = 0;
+  coinPicks = 0;
 
   const levelData = generateSolvableLevel(currentLevel);
   gridBuses = levelData.buses;
@@ -150,6 +180,8 @@ function getTotalPassengers() {
 function update3DPassengerQueue() {
   passenger3DQueue.forEach(pMesh => sceneManager.scene.remove(pMesh));
   passenger3DQueue = [];
+  waitingLine3DQueue.forEach(pMesh => sceneManager.scene.remove(pMesh));
+  waitingLine3DQueue = [];
 
   refillActiveLine();
 
@@ -172,8 +204,8 @@ function update3DPassengerQueue() {
     passenger3DQueue.push(pMesh);
   });
 
-  // ── Row 2: Waiting Line (back arc, smaller, not yet eligible) ──
-  const waitCount = Math.min(waitingLine.length, 15); // show up to 15 from waiting
+  // ── Row 2: Waiting Line (back arc, smaller, clickable for pick) ──
+  const waitCount = Math.min(waitingLine.length, 15);
   for (let idx = 0; idx < waitCount; idx++) {
     const color = waitingLine[idx];
     const pMesh = createPassenger3D(color);
@@ -187,14 +219,15 @@ function update3DPassengerQueue() {
 
     pMesh.position.set(x, 0.3, z);
     pMesh.rotation.y = angle + Math.PI / 2;
-    pMesh.scale.setScalar(0.75); // smaller to show they're waiting
+    pMesh.scale.setScalar(0.75);
+    pMesh.userData.waitingIndex = idx; // tag for raycasting
 
     sceneManager.scene.add(pMesh);
-    passenger3DQueue.push(pMesh);
+    waitingLine3DQueue.push(pMesh);
   }
 }
 
-// ─── Raycasting & Bus Click ───
+// ─── Raycasting & Bus Click + Waiting Line Pick ───
 function handlePointerDown(event) {
   sounds.init();
   const rect = sceneManager.renderer.domElement.getBoundingClientRect();
@@ -202,6 +235,27 @@ function handlePointerDown(event) {
   sceneManager.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   sceneManager.raycaster.setFromCamera(sceneManager.mouse, sceneManager.camera);
 
+  // 1. Check if a waiting line passenger was clicked
+  if (waitingLine3DQueue.length > 0 && getTotalPicks() > 0) {
+    const waitingChildren = [];
+    waitingLine3DQueue.forEach(group => {
+      waitingChildren.push(...group.children);
+    });
+    const waitHits = sceneManager.raycaster.intersectObjects(waitingChildren, true);
+    if (waitHits.length > 0) {
+      // Walk up to find the group with waitingIndex
+      let hit = waitHits[0].object;
+      while (hit && hit.userData.waitingIndex === undefined) {
+        hit = hit.parent;
+      }
+      if (hit && hit.userData.waitingIndex !== undefined) {
+        pickFromWaitingLine(hit.userData.waitingIndex);
+        return;
+      }
+    }
+  }
+
+  // 2. Check if a bus was clicked
   const clickableObjects = [];
   bus3DMap.forEach((group, id) => {
     const bus = gridBuses.find(b => b.id === id);
@@ -236,6 +290,50 @@ function handlePointerDown(event) {
       }
     }
   }
+}
+
+// ─── Pick from Waiting Line ───
+function pickFromWaitingLine(waitIdx) {
+  if (waitIdx < 0 || waitIdx >= waitingLine.length) return;
+  if (getTotalPicks() <= 0) return;
+
+  // Use a pick charge (free first, then video, then coin)
+  if (freePicks > 0) {
+    freePicks--;
+  } else if (videoPicks > 0) {
+    videoPicks--;
+  } else if (coinPicks > 0) {
+    coinPicks--;
+  }
+
+  // Move the picked passenger from waiting line to front of active line
+  const pickedColor = waitingLine.splice(waitIdx, 1)[0];
+  activeLine.unshift(pickedColor);
+
+  sounds.playPassengerBoard();
+  if (navigator.vibrate) navigator.vibrate(30);
+
+  update3DPassengerQueue();
+  renderUI();
+  triggerBoarding();
+}
+
+function handleVideoPickUnlock() {
+  sounds.init();
+  if (videoPicks >= VIDEO_PICKS_MAX) return;
+  // Simulate watching a video ad (instant unlock)
+  videoPicks = VIDEO_PICKS_MAX;
+  sounds.playBooster();
+  renderUI();
+}
+
+function handleCoinPickUnlock() {
+  sounds.init();
+  if (coinPicks >= COIN_PICKS_MAX || coins < COIN_PICK_COST) return;
+  coins -= COIN_PICK_COST;
+  coinPicks = COIN_PICKS_MAX;
+  sounds.playBooster();
+  renderUI();
 }
 
 function onBusClicked(bus) {
@@ -565,6 +663,19 @@ function renderUI() {
   const totalP = getTotalPassengers();
   document.getElementById('dockCapacityLabel').textContent =
     `${totalSlots} Docks · ${totalP} Passengers · Waiting: ${waitingLine.length}`;
+
+  const pickCountEl = document.getElementById('pickCount');
+  if (pickCountEl) {
+    pickCountEl.textContent = getTotalPicks();
+  }
+  const btnVideoPick = document.getElementById('btnVideoPick');
+  if (btnVideoPick) {
+    btnVideoPick.disabled = videoPicks >= VIDEO_PICKS_MAX;
+  }
+  const btnCoinPick = document.getElementById('btnCoinPick');
+  if (btnCoinPick) {
+    btnCoinPick.disabled = coinPicks >= COIN_PICKS_MAX || coins < COIN_PICK_COST;
+  }
 }
 
 // ─── Animation Loop ───
