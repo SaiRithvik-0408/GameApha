@@ -207,12 +207,12 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
   }
   group.add(capacityGroup);
 
-  // Apply Direction Rotation
+  // Apply Direction Rotation so arrow and headlights point in exact movement direction
   let rotationY = 0;
-  if (direction === 'UP') rotationY = Math.PI; // Point towards negative Z
-  else if (direction === 'DOWN') rotationY = 0; // Point towards positive Z
-  else if (direction === 'LEFT') rotationY = -Math.PI / 2; // Point towards negative X
-  else if (direction === 'RIGHT') rotationY = Math.PI / 2; // Point towards positive X
+  if (direction === 'UP') rotationY = 0;                  // Point forward towards negative Z (UP)
+  else if (direction === 'DOWN') rotationY = Math.PI;     // Point forward towards positive Z (DOWN)
+  else if (direction === 'LEFT') rotationY = Math.PI / 2;  // Point forward towards negative X (LEFT)
+  else if (direction === 'RIGHT') rotationY = -Math.PI / 2; // Point forward towards positive X (RIGHT)
 
   group.rotation.y = rotationY;
 
