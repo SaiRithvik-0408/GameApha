@@ -154,7 +154,7 @@ function startLevel(lvl) {
   // Build 3D Bus Meshes
   gridBuses.forEach(bus => {
     const isVert = bus.dir === 'UP' || bus.dir === 'DOWN';
-    const busMesh = createBus3D(bus.color, bus.dir, bus.length);
+    const busMesh = createBus3D(bus.color, bus.dir, bus.length, bus.maxCapacity);
     const worldPos = gridToWorld(bus.r, bus.c, bus.length, isVert);
     busMesh.position.set(worldPos.x, worldPos.y, worldPos.z);
     sceneManager.scene.add(busMesh);

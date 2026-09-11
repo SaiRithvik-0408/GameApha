@@ -60,20 +60,6 @@ function generateLevelInternal(levelNum) {
   const busesData = [];
   const passengerList = [];
 
-  // Each bus needs exactly 3 matching passengers — no distractors
-  for (let i = 0; i < config.totalBuses; i++) {
-    const color = activeColors[i % activeColors.length];
-    for (let p = 0; p < 3; p++) {
-      passengerList.push(color);
-    }
-  }
-
-  // Shuffle passenger queue thoroughly
-  for (let i = passengerList.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [passengerList[i], passengerList[j]] = [passengerList[j], passengerList[i]];
-  }
-
   const occupied = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(false));
   const directions = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
 
@@ -85,6 +71,7 @@ function generateLevelInternal(levelNum) {
 
     const randLen = Math.random();
     const len = randLen < config.compactChance ? 1 : randLen < (1 - config.longChance) ? 2 : 3;
+    const maxCapacity = len === 1 ? 2 : len === 2 ? 3 : 4;
 
     while (!placed && attempts < 400) {
       attempts++;
@@ -122,12 +109,24 @@ function generateLevelInternal(levelNum) {
           c: c,
           length: len,
           passengersCount: 0,
-          maxCapacity: 3,
+          maxCapacity: maxCapacity,
           state: 'GRID'
         });
+
+        // Add corresponding passengers to the list
+        for (let p = 0; p < maxCapacity; p++) {
+          passengerList.push(color);
+        }
+
         placed = true;
       }
     }
+  }
+
+  // Shuffle passenger queue thoroughly
+  for (let i = passengerList.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [passengerList[i], passengerList[j]] = [passengerList[j], passengerList[i]];
   }
 
   return { buses: busesData, passengers: passengerList };

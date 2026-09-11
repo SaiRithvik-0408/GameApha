@@ -83,8 +83,9 @@ function createRoundedBoxGeo(width, height, depth, radius = 0.15) {
  * @param {string} colorKey 
  * @param {string} direction 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'
  * @param {number} length Grid unit length (1, 2, or 3)
+ * @param {number} maxCapacity Number of passengers the bus can hold
  */
-export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
+export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2, maxCapacity = 3) {
   const group = new THREE.Group();
 
   const width = 1.55;
@@ -148,8 +149,9 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
   group.add(trimMesh);
 
   // 5. Bold White Direction Arrow Printed on Roof
-  const arrowMesh = createBoldArrowMesh(0.85, Math.min(depth * 0.6, 1.2));
-  arrowMesh.position.set(0, roofHeight + 0.1, 0);
+  // Make arrow smaller and shift forward to make room for dots
+  const arrowMesh = createBoldArrowMesh(0.65, Math.min(depth * 0.4, 0.9));
+  arrowMesh.position.set(0, roofHeight + 0.1, -depth * 0.15);
   group.add(arrowMesh);
 
   // 6. Front Windshield (curved glass look)
@@ -296,9 +298,9 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
     wheels.push(wheelGroup);
   });
 
-  // 12. Passenger Count Indicators (3 Dots on Roof)
+  // 12. Passenger Count Indicators (Exact number of dots based on capacity)
   const capacityGroup = new THREE.Group();
-  capacityGroup.position.set(0, roofHeight + 0.18, depth * 0.3);
+  capacityGroup.position.set(0, roofHeight + 0.18, depth * 0.25);
 
   const dotGeo = new THREE.SphereGeometry(0.1, 16, 16);
   const emptyDotMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 });
@@ -306,9 +308,10 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
 
   const dots = [];
   const spacing = 0.28;
-  for (let i = 0; i < 3; i++) {
+  const startX = -((maxCapacity - 1) * spacing) / 2; // Center the dots
+  for (let i = 0; i < maxCapacity; i++) {
     const dot = new THREE.Mesh(dotGeo, emptyDotMat);
-    dot.position.set((i - 1) * spacing, 0, 0);
+    dot.position.set(startX + (i * spacing), 0, 0);
     dot.castShadow = true;
     capacityGroup.add(dot);
     dots.push(dot);
