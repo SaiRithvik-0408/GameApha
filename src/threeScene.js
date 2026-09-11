@@ -106,24 +106,24 @@ export class GameScene {
     this.scene.add(pathLine);
 
     // 3. Grid Base Platform (Lower Section)
-    const gridGeo = new THREE.BoxGeometry(11.5, 0.08, 11.5);
+    const gridGeo = new THREE.BoxGeometry(12.5, 0.08, 12.5);
     const gridMat = new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
       roughness: 0.6
     });
     const gridBase = new THREE.Mesh(gridGeo, gridMat);
-    gridBase.position.set(0, 0.04, 1.5);
+    gridBase.position.set(0, 0.04, 3.5);
     gridBase.receiveShadow = true;
     this.scene.add(gridBase);
 
     // Subtle Grid Tile Lines
     const lineMat = new THREE.LineBasicMaterial({ color: 0xcbd5e6, transparent: true, opacity: 0.4 });
     const gridSize = 6;
-    const cellSize = 1.8;
+    const cellSize = 2.0;
 
     for (let r = 0; r <= gridSize; r++) {
       const pts = [];
-      const z = -((gridSize * cellSize) / 2) + r * cellSize + 1.5;
+      const z = -((gridSize * cellSize) / 2) + r * cellSize + 3.5;
       pts.push(new THREE.Vector3(-gridSize * cellSize / 2, 0.09, z));
       pts.push(new THREE.Vector3(gridSize * cellSize / 2, 0.09, z));
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
@@ -133,24 +133,24 @@ export class GameScene {
     for (let c = 0; c <= gridSize; c++) {
       const pts = [];
       const x = -((gridSize * cellSize) / 2) + c * cellSize;
-      pts.push(new THREE.Vector3(x, 0.09, -gridSize * cellSize / 2 + 1.5));
-      pts.push(new THREE.Vector3(x, 0.09, gridSize * cellSize / 2 + 1.5));
+      pts.push(new THREE.Vector3(x, 0.09, -gridSize * cellSize / 2 + 3.5));
+      pts.push(new THREE.Vector3(x, 0.09, gridSize * cellSize / 2 + 3.5));
       const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
       this.scene.add(line);
     }
 
     // 4. Angled Parking Slot Outlines on Asphalt Roadway (Matching Reference Image)
     const numDocks = 6;
-    const dockWidth = 1.8;
-    const startDockX = -4.5;
-    const dockZ = -4.2;
+    const dockWidth = 1.6;
+    const startDockX = -4.8;
+    const dockZ = -2.2;
 
     for (let i = 0; i < numDocks; i++) {
       const slotX = startDockX + i * dockWidth;
 
       // Draw angled yellow/white slot boundary rectangle
       const slotRectGeo = new THREE.PlaneGeometry(1.5, 2.6);
-      const isVIP = i === 0;
+      const isVIP = false;
       const slotRectMat = new THREE.MeshStandardMaterial({
         color: isVIP ? 0xfacc15 : 0x64748b, // Yellow for VIP, grey/white for standard
         roughness: 0.5,
