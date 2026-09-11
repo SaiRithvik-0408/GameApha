@@ -12,30 +12,60 @@ export function gridToWorld(r, c, len = 2, isVert = false) {
 }
 
 export function getBaseSlotsForLevel(levelNum) {
-  // Base docks scale from 4 up to 7 based on level difficulty
-  return Math.min(4 + Math.floor((levelNum - 1) / 3), 7);
+  // Start with 4 docks, add 1 every 2 levels, cap at 7
+  return Math.min(4 + Math.floor(levelNum / 2), 7);
+}
+
+/**
+ * Difficulty config per level range
+ */
+function getDifficultyConfig(levelNum) {
+  // Colors ramp: L1=3, L3=4, L5=5, L7=6, L9=7, L12+=8
+  const numColors = Math.min(3 + Math.floor(levelNum / 2), 8);
+  
+  // Total buses: L1=4, L2=6, L3=8, L5=12, L8=16, L10+=20 max
+  const totalBuses = Math.min(4 + levelNum * 2, 20);
+  
+  // Distractor passengers: 0 at L1, then 2 per level starting L2, max 10
+  const distractorCount = levelNum <= 1 ? 0 : Math.min((levelNum - 1) * 2, 10);
+  
+  // Vehicle length mix changes with difficulty
+  // Early: mostly 2-unit, later: more 1-unit and 3-unit variety
+  const compactChance = Math.min(0.15 + levelNum * 0.03, 0.35);
+  const longChance = Math.min(0.05 + levelNum * 0.02, 0.20);
+  
+  return { numColors, totalBuses, distractorCount, compactChance, longChance };
 }
 
 export function generateSolvableLevel(levelNum) {
   const colorKeys = Object.keys(BUS_COLORS);
-  // Scale active colors: Level 1 = 3 colors, Level 5 = 5 colors, Level 10 = 7 colors
-  const numColors = Math.min(3 + Math.floor((levelNum - 1) / 2), colorKeys.length);
-  const activeColors = colorKeys.slice(0, numColors);
+  const config = getDifficultyConfig(levelNum);
+  const activeColors = colorKeys.slice(0, config.numColors);
 
-  // Scale total vehicles: Level 1 = 6, Level 3 = 10, Level 5 = 14, Level 10 = 22
-  const totalBuses = Math.min(6 + (levelNum - 1) * 2, 22);
   const busesData = [];
   const passengerList = [];
 
   // Generate passenger queue matching vehicles exactly (3 passengers per vehicle)
-  for (let i = 0; i < totalBuses; i++) {
+  for (let i = 0; i < config.totalBuses; i++) {
     const color = activeColors[i % activeColors.length];
     for (let p = 0; p < 3; p++) {
       passengerList.push(color);
     }
   }
 
-  // Shuffle passenger queue
+  // Add distractor passengers (colors that DON'T match any bus on grid)
+  // Use colors NOT in activeColors, or if all colors used, use random active colors
+  const distractorColors = colorKeys.filter(c => !activeColors.includes(c));
+  for (let d = 0; d < config.distractorCount; d++) {
+    if (distractorColors.length > 0) {
+      passengerList.push(distractorColors[d % distractorColors.length]);
+    } else {
+      // All colors in use - add random active color as extra (still a blocker)
+      passengerList.push(activeColors[Math.floor(Math.random() * activeColors.length)]);
+    }
+  }
+
+  // Shuffle passenger queue thoroughly
   for (let i = passengerList.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [passengerList[i], passengerList[j]] = [passengerList[j], passengerList[i]];
@@ -45,16 +75,16 @@ export function generateSolvableLevel(levelNum) {
   const directions = ['UP', 'DOWN', 'LEFT', 'RIGHT'];
 
   let busId = 1;
-  for (let i = 0; i < totalBuses; i++) {
+  for (let i = 0; i < config.totalBuses; i++) {
     const color = activeColors[i % activeColors.length];
     let placed = false;
     let attempts = 0;
 
-    // Mix vehicle lengths: 1-unit compact car (25%), 2-unit bus (65%), 3-unit long bus (10%)
+    // Mix vehicle lengths based on difficulty
     const randLen = Math.random();
-    const len = randLen < 0.25 ? 1 : randLen < 0.9 ? 2 : 3;
+    const len = randLen < config.compactChance ? 1 : randLen < (1 - config.longChance) ? 2 : 3;
 
-    while (!placed && attempts < 200) {
+    while (!placed && attempts < 300) {
       attempts++;
       const dir = directions[Math.floor(Math.random() * directions.length)];
       const isVert = dir === 'UP' || dir === 'DOWN';
