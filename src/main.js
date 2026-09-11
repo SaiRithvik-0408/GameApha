@@ -45,7 +45,7 @@ function getTotalActiveSlots() {
 function getDockWorldPos(slotIndex, totalSlots) {
   const startX = -4.8;
   const stepX = 1.6;
-  return { x: startX + slotIndex * stepX, y: 0.15, z: -2.2 };
+  return { x: startX + slotIndex * stepX, y: 0.15, z: -4.5 };
 }
 
 function initUI() {
@@ -365,8 +365,8 @@ function moveBusToStation3D(bus) {
   let exitTargetX = busMesh.position.x;
   let exitTargetZ = busMesh.position.z;
 
-  if (bus.dir === 'UP') exitTargetZ = -1.8;
-  else if (bus.dir === 'DOWN') exitTargetZ = 9.5;
+  if (bus.dir === 'UP') exitTargetZ = -3.8;
+  else if (bus.dir === 'DOWN') exitTargetZ = 8.5;
   else if (bus.dir === 'LEFT') exitTargetX = -8.5;
   else if (bus.dir === 'RIGHT') exitTargetX = 8.5;
 

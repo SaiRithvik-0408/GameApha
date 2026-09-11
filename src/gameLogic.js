@@ -1,6 +1,6 @@
 import { BUS_COLORS } from './busBuilder.js';
 
-export const GRID_SIZE = 6;
+export const GRID_SIZE = 5;
 export const CELL_SIZE = 2.0;
 export const GRID_START_X = -((GRID_SIZE * CELL_SIZE) / 2) + CELL_SIZE / 2;
 

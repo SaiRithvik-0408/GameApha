@@ -106,7 +106,7 @@ export class GameScene {
     this.scene.add(pathLine);
 
     // 3. Grid Base Platform (Lower Section)
-    const gridGeo = new THREE.BoxGeometry(12.5, 0.08, 12.5);
+    const gridGeo = new THREE.BoxGeometry(10.5, 0.08, 10.5);
     const gridMat = new THREE.MeshStandardMaterial({
       color: 0xe2e8f0,
       roughness: 0.6
@@ -118,7 +118,7 @@ export class GameScene {
 
     // Subtle Grid Tile Lines
     const lineMat = new THREE.LineBasicMaterial({ color: 0xcbd5e6, transparent: true, opacity: 0.4 });
-    const gridSize = 6;
+    const gridSize = 5;
     const cellSize = 2.0;
 
     for (let r = 0; r <= gridSize; r++) {
@@ -143,7 +143,7 @@ export class GameScene {
     const numDocks = 6;
     const dockWidth = 1.6;
     const startDockX = -4.8;
-    const dockZ = -2.2;
+    const dockZ = -4.5;
 
     for (let i = 0; i < numDocks; i++) {
       const slotX = startDockX + i * dockWidth;
