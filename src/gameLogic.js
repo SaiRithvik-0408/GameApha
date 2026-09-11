@@ -39,17 +39,60 @@ function getDifficultyConfig(levelNum) {
 }
 
 export function generateSolvableLevel(levelNum) {
-  // Try up to 5 times to produce a layout different from the last one
   let result;
   let hash;
-  for (let attempt = 0; attempt < 5; attempt++) {
+  let isSolvable = false;
+  let masterAttempts = 0;
+
+  while (!isSolvable && masterAttempts < 2000) {
+    masterAttempts++;
     result = generateLevelInternal(levelNum);
-    hash = result.buses.map(b => `${b.color}${b.r}${b.c}${b.dir}`).join(',') + '|' +
-           result.passengers.slice(0, 10).join(',');
-    if (hash !== lastLayoutHash) break;
+    isSolvable = isLevelSolvable(result.buses);
+
+    if (isSolvable) {
+      hash = result.buses.map(b => `${b.color}${b.r}${b.c}${b.dir}`).join(',') + '|' +
+             result.passengers.slice(0, 10).join(',');
+      
+      // If we found a solvable level but it's the exact same as last time, keep trying
+      // unless we are really struggling (over 100 attempts)
+      if (hash === lastLayoutHash && masterAttempts < 100) {
+        isSolvable = false; 
+      }
+    }
   }
-  lastLayoutHash = hash;
+
+  if (hash) {
+    lastLayoutHash = hash;
+  }
+  console.log(`Generated solvable level ${levelNum} in ${masterAttempts} attempts. Buses: ${result.buses.length}`);
   return result;
+}
+
+function isLevelSolvable(buses) {
+  let remaining = buses.map(b => b.id);
+  let changed = true;
+  
+  while (changed && remaining.length > 0) {
+    changed = false;
+    for (let i = 0; i < remaining.length; i++) {
+      const busId = remaining[i];
+      const bus = buses.find(b => b.id === busId);
+      
+      // Filter buses to only those still remaining in our simulation
+      const virtualGridBuses = buses.filter(b => remaining.includes(b.id)).map(b => ({
+        ...b,
+        state: 'GRID' // Ensure state is GRID for the check
+      }));
+      
+      if (canBusExitGrid(bus, virtualGridBuses)) {
+        remaining.splice(i, 1);
+        changed = true;
+        break; // Start over checking the new remaining list
+      }
+    }
+  }
+  
+  return remaining.length === 0;
 }
 
 function generateLevelInternal(levelNum) {
