@@ -10,7 +10,6 @@ import {
   generateSolvableLevel,
   canBusExitGrid,
   gridToWorld,
-  getBaseSlotsForLevel,
   GRID_SIZE,
   CELL_SIZE
 } from './gameLogic.js';
@@ -32,20 +31,15 @@ let passenger3DQueue = [];      // 3D meshes for active line
 let waitingLine3DQueue = [];    // 3D meshes for waiting line (clickable)
 let isBoardingInProgress = false;
 
-// Pick from waiting line charges
-let freePicks = 3;     // 3 free picks per level
-let videoPicks = 0;    // 2 unlockable via watching a video ad
-let coinPicks = 0;     // 1 unlockable via spending coins
-const VIDEO_PICKS_MAX = 2;
-const COIN_PICKS_MAX = 1;
-const COIN_PICK_COST = 25;
-
-function getTotalPicks() {
-  return freePicks + videoPicks + coinPicks;
-}
+// Dock Unlock charges
+let videoDocks = 0;    // 2 unlockable via watching a video ad
+let coinDocks = 0;     // 1 unlockable via spending coins
+const VIDEO_DOCKS_MAX = 2;
+const COIN_DOCKS_MAX = 1;
+const COIN_DOCK_COST = 25;
 
 function getTotalActiveSlots() {
-  return getBaseSlotsForLevel(currentLevel) + adBonusSlots;
+  return 3 + videoDocks + coinDocks;
 }
 
 function getDockWorldPos(slotIndex, totalSlots) {
@@ -71,14 +65,14 @@ function initUI() {
       <div class="dock-badge-bar" id="dockCapacityLabel">4 Active Docks</div>
     </div>
 
-    <!-- Pick from Waiting Line Panel -->
-    <div class="pick-panel" id="pickPanel">
+    <!-- Unlock Dock Panel -->
+    <div class="pick-panel" id="dockPanel">
       <div class="pick-info">
-        <span class="pick-label">✋ Pick:</span>
-        <span class="pick-count" id="pickCount">3</span>
+        <span class="pick-label">🅿️ Docks:</span>
+        <span class="pick-count" id="dockCount">3/6</span>
       </div>
-      <button class="pick-btn video-btn" id="btnVideoPick">🎬 +2 Free</button>
-      <button class="pick-btn coin-btn" id="btnCoinPick">🪙 +1 (25)</button>
+      <button class="pick-btn video-btn" id="btnVideoDock">🎬 +2 Free</button>
+      <button class="pick-btn coin-btn" id="btnCoinDock">🪙 +1 (25)</button>
     </div>
 
     <footer class="booster-bar">
@@ -118,8 +112,8 @@ function initUI() {
   document.getElementById('btnVIP').addEventListener('click', handleVIPClear);
   document.getElementById('btnAutoClear').addEventListener('click', handleAutoClear);
   document.getElementById('modalBtn').addEventListener('click', handleModalBtnClick);
-  document.getElementById('btnVideoPick').addEventListener('click', handleVideoPickUnlock);
-  document.getElementById('btnCoinPick').addEventListener('click', handleCoinPickUnlock);
+  document.getElementById('btnVideoDock').addEventListener('click', handleVideoDockUnlock);
+  document.getElementById('btnCoinDock').addEventListener('click', handleCoinDockUnlock);
 
   startLevel(1);
   animate();
@@ -138,10 +132,9 @@ function startLevel(lvl) {
   boardingLane = [];
   isBoardingInProgress = false;
 
-  // Reset pick charges each level
-  freePicks = 3;
-  videoPicks = 0;
-  coinPicks = 0;
+  // Reset dock charges each level
+  videoDocks = 0;
+  coinDocks = 0;
 
   const levelData = generateSolvableLevel(currentLevel);
   gridBuses = levelData.buses;
@@ -236,7 +229,7 @@ function handlePointerDown(event) {
   sceneManager.raycaster.setFromCamera(sceneManager.mouse, sceneManager.camera);
 
   // 1. Check if a waiting line passenger was clicked
-  if (waitingLine3DQueue.length > 0 && getTotalPicks() > 0) {
+  if (waitingLine3DQueue.length > 0) {
     const waitingChildren = [];
     waitingLine3DQueue.forEach(group => {
       waitingChildren.push(...group.children);
@@ -292,19 +285,8 @@ function handlePointerDown(event) {
   }
 }
 
-// ─── Pick from Waiting Line ───
 function pickFromWaitingLine(waitIdx) {
   if (waitIdx < 0 || waitIdx >= waitingLine.length) return;
-  if (getTotalPicks() <= 0) return;
-
-  // Use a pick charge (free first, then video, then coin)
-  if (freePicks > 0) {
-    freePicks--;
-  } else if (videoPicks > 0) {
-    videoPicks--;
-  } else if (coinPicks > 0) {
-    coinPicks--;
-  }
 
   // Move the picked passenger from waiting line to front of active line
   const pickedColor = waitingLine.splice(waitIdx, 1)[0];
@@ -318,20 +300,20 @@ function pickFromWaitingLine(waitIdx) {
   triggerBoarding();
 }
 
-function handleVideoPickUnlock() {
+function handleVideoDockUnlock() {
   sounds.init();
-  if (videoPicks >= VIDEO_PICKS_MAX) return;
+  if (videoDocks >= VIDEO_DOCKS_MAX) return;
   // Simulate watching a video ad (instant unlock)
-  videoPicks = VIDEO_PICKS_MAX;
+  videoDocks = VIDEO_DOCKS_MAX;
   sounds.playBooster();
   renderUI();
 }
 
-function handleCoinPickUnlock() {
+function handleCoinDockUnlock() {
   sounds.init();
-  if (coinPicks >= COIN_PICKS_MAX || coins < COIN_PICK_COST) return;
-  coins -= COIN_PICK_COST;
-  coinPicks = COIN_PICKS_MAX;
+  if (coinDocks >= COIN_DOCKS_MAX || coins < COIN_DOCK_COST) return;
+  coins -= COIN_DOCK_COST;
+  coinDocks = COIN_DOCKS_MAX;
   sounds.playBooster();
   renderUI();
 }
@@ -664,17 +646,17 @@ function renderUI() {
   document.getElementById('dockCapacityLabel').textContent =
     `${totalSlots} Docks · ${totalP} Passengers · Waiting: ${waitingLine.length}`;
 
-  const pickCountEl = document.getElementById('pickCount');
-  if (pickCountEl) {
-    pickCountEl.textContent = getTotalPicks();
+  const dockCountEl = document.getElementById('dockCount');
+  if (dockCountEl) {
+    dockCountEl.textContent = `${totalSlots}/6`;
   }
-  const btnVideoPick = document.getElementById('btnVideoPick');
-  if (btnVideoPick) {
-    btnVideoPick.disabled = videoPicks >= VIDEO_PICKS_MAX;
+  const btnVideoDock = document.getElementById('btnVideoDock');
+  if (btnVideoDock) {
+    btnVideoDock.disabled = videoDocks >= VIDEO_DOCKS_MAX;
   }
-  const btnCoinPick = document.getElementById('btnCoinPick');
-  if (btnCoinPick) {
-    btnCoinPick.disabled = coinPicks >= COIN_PICKS_MAX || coins < COIN_PICK_COST;
+  const btnCoinDock = document.getElementById('btnCoinDock');
+  if (btnCoinDock) {
+    btnCoinDock.disabled = coinDocks >= COIN_DOCKS_MAX || coins < COIN_DOCK_COST;
   }
 }
 
