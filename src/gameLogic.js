@@ -12,27 +12,28 @@ export function gridToWorld(r, c, len = 2, isVert = false) {
 }
 
 export function getBaseSlotsForLevel(levelNum) {
-  // Start with 4 docks, add 1 every 2 levels, cap at 7
-  return Math.min(4 + Math.floor(levelNum / 2), 7);
+  // Start with 4 docks, ramp slowly
+  return Math.min(4 + Math.floor(levelNum / 3), 7);
 }
 
 /**
  * Difficulty config per level range
  */
 function getDifficultyConfig(levelNum) {
-  // Colors ramp: L1=3, L3=4, L5=5, L7=6, L9=7, L12+=8
-  const numColors = Math.min(3 + Math.floor(levelNum / 2), 8);
+  // Colors ramp: L1=3, L3=4, L5=5, L7=6, L10=7, L13+=8
+  const numColors = Math.min(3 + Math.floor((levelNum) / 3), 8);
   
-  // Total buses: L1=4, L2=6, L3=8, L5=12, L8=16, L10+=20 max
-  const totalBuses = Math.min(4 + levelNum * 2, 20);
+  // Passengers per bus is always 3
+  // For easy rounds: total buses = exact minimum needed
+  // Level 1: 3 buses (9 passengers), L2: 4, L3: 5 ... L10: 12, capped at 18
+  const totalBuses = Math.min(3 + (levelNum - 1), 18);
   
-  // Distractor passengers: 0 at L1, then 2 per level starting L2, max 10
-  const distractorCount = levelNum <= 1 ? 0 : Math.min((levelNum - 1) * 2, 10);
+  // Distractor passengers: 0 at L1-L2, then ramp up
+  const distractorCount = levelNum <= 2 ? 0 : Math.min(Math.floor((levelNum - 2) * 1.5), 8);
   
   // Vehicle length mix changes with difficulty
-  // Early: mostly 2-unit, later: more 1-unit and 3-unit variety
-  const compactChance = Math.min(0.15 + levelNum * 0.03, 0.35);
-  const longChance = Math.min(0.05 + levelNum * 0.02, 0.20);
+  const compactChance = Math.min(0.1 + levelNum * 0.02, 0.30);
+  const longChance = Math.min(0.02 + levelNum * 0.015, 0.18);
   
   return { numColors, totalBuses, distractorCount, compactChance, longChance };
 }
@@ -45,7 +46,8 @@ export function generateSolvableLevel(levelNum) {
   const busesData = [];
   const passengerList = [];
 
-  // Generate passenger queue matching vehicles exactly (3 passengers per vehicle)
+  // Each bus needs exactly 3 matching passengers
+  // buses = minimum needed = totalBuses (which equals passengers/3)
   for (let i = 0; i < config.totalBuses; i++) {
     const color = activeColors[i % activeColors.length];
     for (let p = 0; p < 3; p++) {
@@ -53,15 +55,11 @@ export function generateSolvableLevel(levelNum) {
     }
   }
 
-  // Add distractor passengers (colors that DON'T match any bus on grid)
-  // Use colors NOT in activeColors, or if all colors used, use random active colors
+  // Add distractor passengers (colors with no matching bus)
   const distractorColors = colorKeys.filter(c => !activeColors.includes(c));
   for (let d = 0; d < config.distractorCount; d++) {
     if (distractorColors.length > 0) {
       passengerList.push(distractorColors[d % distractorColors.length]);
-    } else {
-      // All colors in use - add random active color as extra (still a blocker)
-      passengerList.push(activeColors[Math.floor(Math.random() * activeColors.length)]);
     }
   }
 
@@ -80,11 +78,10 @@ export function generateSolvableLevel(levelNum) {
     let placed = false;
     let attempts = 0;
 
-    // Mix vehicle lengths based on difficulty
     const randLen = Math.random();
     const len = randLen < config.compactChance ? 1 : randLen < (1 - config.longChance) ? 2 : 3;
 
-    while (!placed && attempts < 300) {
+    while (!placed && attempts < 400) {
       attempts++;
       const dir = directions[Math.floor(Math.random() * directions.length)];
       const isVert = dir === 'UP' || dir === 'DOWN';

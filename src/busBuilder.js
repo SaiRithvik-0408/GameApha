@@ -43,22 +43,22 @@ function createBoldArrowMesh(width = 0.8, depth = 1.0) {
   const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
   geo.rotateX(Math.PI / 2); // Lay flat on XZ plane
 
-  // White emissive material with dark border background
+  // White emissive material with glow
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     emissive: 0xffffff,
-    emissiveIntensity: 0.4,
-    roughness: 0.1,
+    emissiveIntensity: 0.5,
+    roughness: 0.05,
     metalness: 0.1
   });
 
   const arrowMesh = new THREE.Mesh(geo, mat);
   arrowMesh.castShadow = true;
 
-  // Dark background base outline plate for maximum contrast
+  // Dark background plate for contrast
   const baseGeo = new THREE.ExtrudeGeometry(shape, { ...extrudeSettings, depth: 0.04 });
   baseGeo.rotateX(Math.PI / 2);
-  baseGeo.scale(1.12, 1.0, 1.12);
+  baseGeo.scale(1.15, 1.0, 1.15);
   const baseMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
   const baseMesh = new THREE.Mesh(baseGeo, baseMat);
   baseMesh.position.y = -0.02;
@@ -71,7 +71,15 @@ function createBoldArrowMesh(width = 0.8, depth = 1.0) {
 }
 
 /**
- * Creates a detailed 3D Bus Mesh
+ * Creates a rounded box shape for realistic bus bodies
+ */
+function createRoundedBoxGeo(width, height, depth, radius = 0.15) {
+  // Use a standard box but we'll add separate rounded trim pieces
+  return new THREE.BoxGeometry(width, height, depth, 2, 2, 2);
+}
+
+/**
+ * Creates a detailed, realistic 3D Bus Mesh
  * @param {string} colorKey 
  * @param {string} direction 'UP' | 'DOWN' | 'LEFT' | 'RIGHT'
  * @param {number} length Grid unit length (1, 2, or 3)
@@ -79,100 +87,198 @@ function createBoldArrowMesh(width = 0.8, depth = 1.0) {
 export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
   const group = new THREE.Group();
 
-  const width = 1.6;
-  const height = 1.2;
+  const width = 1.55;
+  const height = 1.15;
   const depth = length * 1.7;
 
   const hexColor = BUS_COLORS[colorKey] || 0x3b82f6;
+  const darkerHex = darkenColor(hexColor, 0.7);
+  const lighterHex = lightenColor(hexColor, 1.25);
 
-  // 1. Bus Main Body
+  // 1. Bus Main Body - Rounded appearance
   const bodyGeo = new THREE.BoxGeometry(width, height, depth);
   const bodyMat = new THREE.MeshStandardMaterial({
     color: hexColor,
-    roughness: 0.25,
-    metalness: 0.2
+    roughness: 0.18,
+    metalness: 0.35
   });
   const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
-  bodyMesh.position.y = height / 2 + 0.25;
+  bodyMesh.position.y = height / 2 + 0.28;
   bodyMesh.castShadow = true;
   bodyMesh.receiveShadow = true;
   group.add(bodyMesh);
 
-  // 2. Bus Roof Cap
-  const roofHeight = height + 0.26;
-  const roofGeo = new THREE.BoxGeometry(width * 0.94, 0.12, depth * 0.94);
-  const roofMat = new THREE.MeshStandardMaterial({ color: hexColor, roughness: 0.3 });
+  // 2. Lower body panel / skirt (darker shade)
+  const skirtHeight = 0.18;
+  const skirtGeo = new THREE.BoxGeometry(width + 0.04, skirtHeight, depth + 0.02);
+  const skirtMat = new THREE.MeshStandardMaterial({
+    color: darkerHex,
+    roughness: 0.4,
+    metalness: 0.2
+  });
+  const skirt = new THREE.Mesh(skirtGeo, skirtMat);
+  skirt.position.y = 0.28 + skirtHeight / 2 - 0.02;
+  skirt.castShadow = true;
+  group.add(skirt);
+
+  // 3. Bus Roof Cap (slightly lighter, rounded feel)
+  const roofHeight = height + 0.3;
+  const roofGeo = new THREE.BoxGeometry(width * 0.92, 0.14, depth * 0.92);
+  const roofMat = new THREE.MeshStandardMaterial({
+    color: lighterHex,
+    roughness: 0.25,
+    metalness: 0.15
+  });
   const roofMesh = new THREE.Mesh(roofGeo, roofMat);
   roofMesh.position.y = roofHeight;
   roofMesh.castShadow = true;
   group.add(roofMesh);
 
-  // 3. Bold White Direction Arrow Printed on Roof
+  // 4. Rounded roof edge trim
+  const trimGeo = new THREE.BoxGeometry(width + 0.06, 0.06, depth + 0.04);
+  const trimMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.1,
+    metalness: 0.6,
+    transparent: true,
+    opacity: 0.3
+  });
+  const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+  trimMesh.position.y = roofHeight - 0.05;
+  group.add(trimMesh);
+
+  // 5. Bold White Direction Arrow Printed on Roof
   const arrowMesh = createBoldArrowMesh(0.85, Math.min(depth * 0.6, 1.2));
-  arrowMesh.position.set(0, roofHeight + 0.08, 0);
+  arrowMesh.position.set(0, roofHeight + 0.1, 0);
   group.add(arrowMesh);
 
-  // 4. Windows & Windshield
+  // 6. Front Windshield (curved glass look)
   const glassMat = new THREE.MeshPhysicalMaterial({
     color: 0x1e293b,
-    roughness: 0.1,
-    metalness: 0.8,
-    transmission: 0.5,
+    roughness: 0.05,
+    metalness: 0.9,
+    transmission: 0.6,
     transparent: true,
-    opacity: 0.85
+    opacity: 0.88,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.1
   });
 
-  // Front Windshield
-  const windshieldGeo = new THREE.BoxGeometry(width * 0.88, height * 0.45, 0.08);
+  const windshieldGeo = new THREE.BoxGeometry(width * 0.86, height * 0.5, 0.06);
   const windshield = new THREE.Mesh(windshieldGeo, glassMat);
-  windshield.position.set(0, height * 0.65 + 0.25, -depth / 2 - 0.01);
+  windshield.position.set(0, height * 0.7 + 0.28, -depth / 2 - 0.01);
   group.add(windshield);
 
-  // Back Window
+  // Front bumper
+  const bumperGeo = new THREE.BoxGeometry(width * 0.95, 0.12, 0.12);
+  const bumperMat = new THREE.MeshStandardMaterial({
+    color: 0x334155,
+    roughness: 0.3,
+    metalness: 0.7
+  });
+  const frontBumper = new THREE.Mesh(bumperGeo, bumperMat);
+  frontBumper.position.set(0, 0.35, -depth / 2 - 0.04);
+  group.add(frontBumper);
+
+  // 7. Back Window + rear bumper
   const backWindow = new THREE.Mesh(windshieldGeo, glassMat);
-  backWindow.position.set(0, height * 0.65 + 0.25, depth / 2 + 0.01);
+  backWindow.position.set(0, height * 0.7 + 0.28, depth / 2 + 0.01);
   group.add(backWindow);
 
-  // Side Windows
-  const sideWindowGeo = new THREE.BoxGeometry(0.08, height * 0.35, depth * 0.7);
+  const rearBumper = new THREE.Mesh(bumperGeo, bumperMat);
+  rearBumper.position.set(0, 0.35, depth / 2 + 0.04);
+  group.add(rearBumper);
+
+  // 8. Side Windows with chrome frames
+  const sideWindowGeo = new THREE.BoxGeometry(0.06, height * 0.38, depth * 0.68);
   const leftWindow = new THREE.Mesh(sideWindowGeo, glassMat);
-  leftWindow.position.set(-width / 2 - 0.01, height * 0.65 + 0.25, 0);
+  leftWindow.position.set(-width / 2 - 0.01, height * 0.68 + 0.28, 0);
   group.add(leftWindow);
 
   const rightWindow = new THREE.Mesh(sideWindowGeo, glassMat);
-  rightWindow.position.set(width / 2 + 0.01, height * 0.65 + 0.25, 0);
+  rightWindow.position.set(width / 2 + 0.01, height * 0.68 + 0.28, 0);
   group.add(rightWindow);
 
-  // 5. Headlights & Taillights
-  const headlightMat = new THREE.MeshBasicMaterial({ color: 0xfffbeb });
-  const lightGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 16);
-  lightGeo.rotateX(Math.PI / 2);
+  // Chrome window frame strips
+  const chromeFrameMat = new THREE.MeshStandardMaterial({
+    color: 0xd4d4d8,
+    roughness: 0.1,
+    metalness: 0.9
+  });
+  const frameGeo = new THREE.BoxGeometry(0.04, 0.04, depth * 0.72);
+  
+  const leftFrameTop = new THREE.Mesh(frameGeo, chromeFrameMat);
+  leftFrameTop.position.set(-width / 2 - 0.02, height * 0.68 + 0.28 + height * 0.19, 0);
+  group.add(leftFrameTop);
+
+  const rightFrameTop = new THREE.Mesh(frameGeo, chromeFrameMat);
+  rightFrameTop.position.set(width / 2 + 0.02, height * 0.68 + 0.28 + height * 0.19, 0);
+  group.add(rightFrameTop);
+
+  // 9. Headlights (round, with glow)
+  const headlightMat = new THREE.MeshStandardMaterial({
+    color: 0xfffde7,
+    emissive: 0xfff59d,
+    emissiveIntensity: 0.8,
+    roughness: 0.1
+  });
+  const lightGeo = new THREE.SphereGeometry(0.1, 16, 16);
 
   const leftLight = new THREE.Mesh(lightGeo, headlightMat);
-  leftLight.position.set(-width * 0.35, height * 0.35, -depth / 2 - 0.02);
+  leftLight.position.set(-width * 0.35, height * 0.38, -depth / 2 - 0.04);
   group.add(leftLight);
 
   const rightLight = new THREE.Mesh(lightGeo, headlightMat);
-  rightLight.position.set(width * 0.35, height * 0.35, -depth / 2 - 0.02);
+  rightLight.position.set(width * 0.35, height * 0.38, -depth / 2 - 0.04);
   group.add(rightLight);
 
-  // 6. Wheels
-  const wheelRadius = 0.32;
-  const wheelWidth = 0.22;
+  // Taillights (red)
+  const taillightMat = new THREE.MeshStandardMaterial({
+    color: 0xff1744,
+    emissive: 0xff1744,
+    emissiveIntensity: 0.5,
+    roughness: 0.2
+  });
+
+  const leftTaillight = new THREE.Mesh(lightGeo, taillightMat);
+  leftTaillight.position.set(-width * 0.35, height * 0.38, depth / 2 + 0.04);
+  group.add(leftTaillight);
+
+  const rightTaillight = new THREE.Mesh(lightGeo, taillightMat);
+  rightTaillight.position.set(width * 0.35, height * 0.38, depth / 2 + 0.04);
+  group.add(rightTaillight);
+
+  // 10. Front grille
+  const grilleMat = new THREE.MeshStandardMaterial({
+    color: 0x1a1a1a,
+    roughness: 0.5,
+    metalness: 0.4
+  });
+  const grilleGeo = new THREE.BoxGeometry(width * 0.5, 0.18, 0.04);
+  const grille = new THREE.Mesh(grilleGeo, grilleMat);
+  grille.position.set(0, 0.5, -depth / 2 - 0.03);
+  group.add(grille);
+
+  // 11. Wheels with detailed rims and hubcaps
+  const wheelRadius = 0.3;
+  const wheelWidth = 0.2;
   const wheelGeo = new THREE.CylinderGeometry(wheelRadius, wheelRadius, wheelWidth, 24);
   wheelGeo.rotateZ(Math.PI / 2);
 
-  const tireMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.8 });
-  const rimMat = new THREE.MeshStandardMaterial({ color: 0xe4e4e7, metalness: 0.8, roughness: 0.2 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x18181b, roughness: 0.75 });
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0xe4e4e7, metalness: 0.85, roughness: 0.15 });
+  const hubMat = new THREE.MeshStandardMaterial({ color: 0xa3a3a3, metalness: 0.9, roughness: 0.1 });
 
-  const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.55, wheelRadius * 0.55, wheelWidth + 0.02, 16);
+  const rimGeo = new THREE.CylinderGeometry(wheelRadius * 0.6, wheelRadius * 0.6, wheelWidth + 0.02, 16);
   rimGeo.rotateZ(Math.PI / 2);
+  const hubGeo = new THREE.CylinderGeometry(wheelRadius * 0.2, wheelRadius * 0.2, wheelWidth + 0.04, 8);
+  hubGeo.rotateZ(Math.PI / 2);
 
   const wheelPositions = [
-    [-width / 2 - 0.04, wheelRadius, -depth * 0.3],
-    [width / 2 + 0.04, wheelRadius, -depth * 0.3],
-    [-width / 2 - 0.04, wheelRadius, depth * 0.3],
-    [width / 2 + 0.04, wheelRadius, depth * 0.3]
+    [-width / 2 - 0.06, wheelRadius, -depth * 0.32],
+    [width / 2 + 0.06, wheelRadius, -depth * 0.32],
+    [-width / 2 - 0.06, wheelRadius, depth * 0.32],
+    [width / 2 + 0.06, wheelRadius, depth * 0.32]
   ];
 
   const wheels = [];
@@ -181,20 +287,22 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
     const tire = new THREE.Mesh(wheelGeo, tireMat);
     tire.castShadow = true;
     const rim = new THREE.Mesh(rimGeo, rimMat);
+    const hub = new THREE.Mesh(hubGeo, hubMat);
     wheelGroup.add(tire);
     wheelGroup.add(rim);
+    wheelGroup.add(hub);
     wheelGroup.position.set(...pos);
     group.add(wheelGroup);
     wheels.push(wheelGroup);
   });
 
-  // 7. Passenger Count Indicators (3 Dots on Roof Base)
+  // 12. Passenger Count Indicators (3 Dots on Roof)
   const capacityGroup = new THREE.Group();
-  capacityGroup.position.set(0, roofHeight + 0.16, depth * 0.3);
+  capacityGroup.position.set(0, roofHeight + 0.18, depth * 0.3);
 
   const dotGeo = new THREE.SphereGeometry(0.1, 16, 16);
   const emptyDotMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5 });
-  const filledDotMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.6 });
+  const filledDotMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 0.7 });
 
   const dots = [];
   const spacing = 0.28;
@@ -236,4 +344,19 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2) {
   };
 
   return group;
+}
+
+// Color utility helpers
+function darkenColor(hex, factor) {
+  const r = ((hex >> 16) & 0xff) * factor;
+  const g = ((hex >> 8) & 0xff) * factor;
+  const b = (hex & 0xff) * factor;
+  return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+}
+
+function lightenColor(hex, factor) {
+  const r = Math.min(255, ((hex >> 16) & 0xff) * factor);
+  const g = Math.min(255, ((hex >> 8) & 0xff) * factor);
+  const b = Math.min(255, (hex & 0xff) * factor);
+  return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
 }
