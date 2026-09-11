@@ -27,18 +27,15 @@ function getDifficultyConfig(levelNum) {
   const numColors = Math.min(3 + Math.floor((levelNum) / 3), 8);
   
   // Passengers per bus is always 3
-  // For easy rounds: total buses = exact minimum needed
+  // Total buses = exact minimum needed for the level
   // Level 1: 3 buses (9 passengers), L2: 4, L3: 5 ... L10: 12, capped at 18
   const totalBuses = Math.min(3 + (levelNum - 1), 18);
-  
-  // Distractor passengers: 0 at L1-L2, then ramp up
-  const distractorCount = levelNum <= 2 ? 0 : Math.min(Math.floor((levelNum - 2) * 1.5), 8);
   
   // Vehicle length mix changes with difficulty
   const compactChance = Math.min(0.1 + levelNum * 0.02, 0.30);
   const longChance = Math.min(0.02 + levelNum * 0.015, 0.18);
   
-  return { numColors, totalBuses, distractorCount, compactChance, longChance };
+  return { numColors, totalBuses, compactChance, longChance };
 }
 
 export function generateSolvableLevel(levelNum) {
@@ -47,7 +44,6 @@ export function generateSolvableLevel(levelNum) {
   let hash;
   for (let attempt = 0; attempt < 5; attempt++) {
     result = generateLevelInternal(levelNum);
-    // Create a simple hash of bus positions + passenger order
     hash = result.buses.map(b => `${b.color}${b.r}${b.c}${b.dir}`).join(',') + '|' +
            result.passengers.slice(0, 10).join(',');
     if (hash !== lastLayoutHash) break;
@@ -64,20 +60,11 @@ function generateLevelInternal(levelNum) {
   const busesData = [];
   const passengerList = [];
 
-  // Each bus needs exactly 3 matching passengers
-  // buses = minimum needed = totalBuses (which equals passengers/3)
+  // Each bus needs exactly 3 matching passengers — no distractors
   for (let i = 0; i < config.totalBuses; i++) {
     const color = activeColors[i % activeColors.length];
     for (let p = 0; p < 3; p++) {
       passengerList.push(color);
-    }
-  }
-
-  // Add distractor passengers (colors with no matching bus)
-  const distractorColors = colorKeys.filter(c => !activeColors.includes(c));
-  for (let d = 0; d < config.distractorCount; d++) {
-    if (distractorColors.length > 0) {
-      passengerList.push(distractorColors[d % distractorColors.length]);
     }
   }
 

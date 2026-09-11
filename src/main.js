@@ -153,13 +153,12 @@ function update3DPassengerQueue() {
 
   refillActiveLine();
 
-  const maxVisible = activeLine.length;
-
+  // ── Row 1: Active Line (front arc, full size, eligible to board) ──
+  const activeCount = activeLine.length;
   activeLine.forEach((color, idx) => {
     const pMesh = createPassenger3D(color);
 
-    // Arc queue layout
-    const t = maxVisible > 1 ? idx / (maxVisible - 1) : 0;
+    const t = activeCount > 1 ? idx / (activeCount - 1) : 0;
     const angle = Math.PI * 0.15 + t * Math.PI * 0.7;
     const radiusX = 5.8;
     const radiusZ = 3.2;
@@ -169,10 +168,30 @@ function update3DPassengerQueue() {
     pMesh.position.set(x, 0.3, z);
     pMesh.rotation.y = angle + Math.PI / 2;
 
-    // No special highlight - all first 10 are eligible
     sceneManager.scene.add(pMesh);
     passenger3DQueue.push(pMesh);
   });
+
+  // ── Row 2: Waiting Line (back arc, smaller, not yet eligible) ──
+  const waitCount = Math.min(waitingLine.length, 15); // show up to 15 from waiting
+  for (let idx = 0; idx < waitCount; idx++) {
+    const color = waitingLine[idx];
+    const pMesh = createPassenger3D(color);
+
+    const t = waitCount > 1 ? idx / (waitCount - 1) : 0;
+    const angle = Math.PI * 0.1 + t * Math.PI * 0.8;
+    const radiusX = 7.2;
+    const radiusZ = 3.8;
+    const x = Math.cos(angle) * radiusX;
+    const z = -12.5 + Math.sin(angle) * radiusZ;
+
+    pMesh.position.set(x, 0.3, z);
+    pMesh.rotation.y = angle + Math.PI / 2;
+    pMesh.scale.setScalar(0.75); // smaller to show they're waiting
+
+    sceneManager.scene.add(pMesh);
+    passenger3DQueue.push(pMesh);
+  }
 }
 
 // ─── Raycasting & Bus Click ───
@@ -362,30 +381,7 @@ function processBoarding() {
     // Continue boarding with delay
     setTimeout(() => processBoarding(), 280);
   } else {
-    // No match found in active line
-    // Auto-skip distractor passengers (colors with no matching bus anywhere)
-    let skippedAny = false;
-    for (let i = 0; i < activeLine.length; i++) {
-      const color = activeLine[i];
-      const hasMatchOnGrid = gridBuses.some(b => b.color === color && (b.state === 'GRID' || b.state === 'MOVING_TO_STATION' || b.state === 'STATION'));
-      const hasMatchInLane = boardingLane.some(b => b.color === color && b.passengersCount < b.maxCapacity);
-      if (!hasMatchOnGrid && !hasMatchInLane) {
-        // Distractor - remove silently
-        activeLine.splice(i, 1);
-        skippedAny = true;
-        i--; // re-check same index
-      }
-    }
-
-    if (skippedAny) {
-      refillActiveLine();
-      update3DPassengerQueue();
-      renderUI();
-      setTimeout(() => processBoarding(), 180);
-      return;
-    }
-
-    // Genuine no-match: stop boarding, wait for new bus
+    // No match in active line right now — wait for a new bus to dock
     isBoardingInProgress = false;
     update3DPassengerQueue();
     renderUI();
