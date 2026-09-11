@@ -3,6 +3,9 @@ import { BUS_COLORS } from './busBuilder.js';
 export const GRID_SIZE = 6;
 export const CELL_SIZE = 1.8;
 export const GRID_START_X = -((GRID_SIZE * CELL_SIZE) / 2) + CELL_SIZE / 2;
+
+// Track last generated layout hash to ensure restarts produce different layouts
+let lastLayoutHash = '';
 export const GRID_START_Z = -((GRID_SIZE * CELL_SIZE) / 2) + CELL_SIZE / 2 + 1.5;
 
 export function gridToWorld(r, c, len = 2, isVert = false) {
@@ -39,6 +42,21 @@ function getDifficultyConfig(levelNum) {
 }
 
 export function generateSolvableLevel(levelNum) {
+  // Try up to 5 times to produce a layout different from the last one
+  let result;
+  let hash;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    result = generateLevelInternal(levelNum);
+    // Create a simple hash of bus positions + passenger order
+    hash = result.buses.map(b => `${b.color}${b.r}${b.c}${b.dir}`).join(',') + '|' +
+           result.passengers.slice(0, 10).join(',');
+    if (hash !== lastLayoutHash) break;
+  }
+  lastLayoutHash = hash;
+  return result;
+}
+
+function generateLevelInternal(levelNum) {
   const colorKeys = Object.keys(BUS_COLORS);
   const config = getDifficultyConfig(levelNum);
   const activeColors = colorKeys.slice(0, config.numColors);
