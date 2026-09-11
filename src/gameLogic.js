@@ -119,7 +119,7 @@ export function canBusExitGrid(bus, buses) {
     }
   } else if (bus.dir === 'RIGHT') {
     for (let c = bus.c + bus.length; c < GRID_SIZE; c++) {
-      if (isCellOccupiedInGrid(bus.r, c + bus.length - 1, buses, bus.id)) return false;
+      if (isCellOccupiedInGrid(bus.r, c, buses, bus.id)) return false;
     }
   }
   return true;

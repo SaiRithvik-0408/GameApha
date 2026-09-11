@@ -60,7 +60,7 @@ function initUI() {
     </header>
 
     <main class="game-viewport" id="viewportContainer">
-      <!-- 3D Canvas Canvas container -->
+      <!-- 3D Canvas Container -->
     </main>
 
     <!-- Overlay UI for Docks & Passengers -->
@@ -261,7 +261,6 @@ function moveBusToStation3D(bus) {
   const dockPos = getDockWorldPos(targetSlotIndex, totalSlots);
 
   // Animate Bus driving out of grid to docking platform
-  const isVert = bus.dir === 'UP' || bus.dir === 'DOWN';
   let exitTargetX = busMesh.position.x;
   let exitTargetZ = busMesh.position.z;
 
@@ -276,7 +275,7 @@ function moveBusToStation3D(bus) {
   timeline.to(busMesh.position, {
     x: exitTargetX,
     z: exitTargetZ,
-    duration: 0.4,
+    duration: 0.35,
     ease: 'power2.in'
   });
 
@@ -291,7 +290,7 @@ function moveBusToStation3D(bus) {
     x: dockPos.x,
     y: dockPos.y,
     z: dockPos.z,
-    duration: 0.4,
+    duration: 0.35,
     ease: 'power2.out',
     onComplete: () => {
       bus.state = 'STATION';
@@ -301,34 +300,35 @@ function moveBusToStation3D(bus) {
   });
 
   renderUI();
+  processBoarding(); // Start checking boarding right away
 }
 
 function processBoarding() {
   if (passengers.length === 0 && boardingLane.length === 0 && gridBuses.every(b => b.state === 'EXITING')) {
-    triggerWin();
+    setTimeout(triggerWin, 600);
     return;
   }
 
-  // Boarding loop
-  let boardedAny = false;
+  let boardedInThisPass = false;
 
-  while (passengers.length > 0) {
-    const frontColor = passengers[0];
-    const targetBus = boardingLane.find(b => b.color === frontColor && b.passengersCount < b.maxCapacity && b.state === 'STATION');
+  // Search queue for matching passenger to any available docked bus
+  for (let pIdx = 0; pIdx < passengers.length; pIdx++) {
+    const pColor = passengers[pIdx];
+
+    const targetBus = boardingLane.find(
+      b => b.color === pColor && b.passengersCount < b.maxCapacity && (b.state === 'STATION' || b.state === 'MOVING_TO_STATION')
+    );
 
     if (targetBus) {
-      passengers.shift();
+      const [boardedColor] = passengers.splice(pIdx, 1);
       targetBus.passengersCount++;
       score += 10;
-      boardedAny = true;
+      boardedInThisPass = true;
 
       sounds.playPassengerBoard();
 
-      // Update 3D Bus capacity visual
-      const busMesh = bus3DMap.get(targetBus.id);
-      if (busMesh && busMesh.userData.updateCapacity) {
-        busMesh.userData.updateCapacity(targetBus.passengersCount);
-      }
+      // Animate 3D Passenger entering bus
+      animatePassengerBoarding3D(boardedColor, targetBus);
 
       // Check if bus is full
       if (targetBus.passengersCount >= targetBus.maxCapacity) {
@@ -337,10 +337,11 @@ function processBoarding() {
         score += 50;
         coins += 5;
 
-        // Animate full bus exit driving off into city road
-        setTimeout(() => animateBusExit3D(targetBus), 200);
+        setTimeout(() => animateBusExit3D(targetBus), 400);
       }
-    } else {
+
+      // Schedule next boarding pass for continuous flow
+      setTimeout(processBoarding, 200);
       break;
     }
   }
@@ -351,15 +352,56 @@ function processBoarding() {
   // Game over check
   const activeSlots = getTotalActiveSlots();
   if (boardingLane.length >= activeSlots && passengers.length > 0) {
-    const canBoardNext = boardingLane.some(b => b.color === passengers[0] && b.passengersCount < b.maxCapacity);
-    if (!canBoardNext) {
-      setTimeout(triggerGameOver, 700);
+    const canBoardNext = passengers.some(pColor =>
+      boardingLane.some(b => b.color === pColor && b.passengersCount < b.maxCapacity)
+    );
+    if (!canBoardNext && !boardedInThisPass && boardingLane.every(b => b.state === 'STATION')) {
+      setTimeout(triggerGameOver, 900);
     }
   }
 
   if (gridBuses.every(b => b.state === 'EXITING') && passengers.length === 0) {
-    setTimeout(triggerWin, 800);
+    setTimeout(triggerWin, 600);
   }
+}
+
+function animatePassengerBoarding3D(colorKey, targetBus) {
+  const pMesh = createPassenger3D(colorKey);
+  const startX = -5;
+  const startZ = -4.5;
+  pMesh.position.set(startX, 0.3, startZ);
+  sceneManager.scene.add(pMesh);
+
+  const busMesh = bus3DMap.get(targetBus.id);
+  const endX = busMesh ? busMesh.position.x : 0;
+  const endZ = busMesh ? busMesh.position.z : -6;
+
+  // Animate 3D passenger walking & hopping into the bus door
+  const timeline = gsap.timeline();
+  timeline.to(pMesh.position, {
+    x: endX,
+    z: endZ,
+    duration: 0.3,
+    ease: 'power1.out'
+  });
+  timeline.to(pMesh.position, {
+    y: 1.2,
+    duration: 0.15,
+    yoyo: true,
+    repeat: 1
+  }, 0);
+  timeline.to(pMesh.scale, {
+    x: 0,
+    y: 0,
+    z: 0,
+    duration: 0.15,
+    onComplete: () => {
+      sceneManager.scene.remove(pMesh);
+      if (busMesh && busMesh.userData.updateCapacity) {
+        busMesh.userData.updateCapacity(targetBus.passengersCount);
+      }
+    }
+  });
 }
 
 function animateBusExit3D(bus) {
