@@ -1,6 +1,13 @@
+*.zip
+*.apk
 node_modules/
 dist/
 .vite/
+android/app/build/
+android/.gradle/
+android/build/
+android/gradle-bin.zip
+android/gradle-extracted/
 flutter_version/.dart_tool/
 flutter_version/build/
 unity_version/Library/
@@ -8,3 +15,5 @@ unity_version/Temp/
 unity_version/Logs/
 unity_version/UserSettings/
 .DS_Store
+
+

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bus Fever Party</string>
+    <string name="title_activity_main">Bus Fever Party</string>
+    <string name="package_name">com.sairithvik.busfeverparty</string>
+    <string name="custom_url_scheme">com.sairithvik.busfeverparty</string>
+</resources>
