@@ -433,3 +433,28 @@ body {
   text-shadow: none;
   box-shadow: 0 4px 12px rgba(245, 209, 0, 0.3);
 }
+
+/* --- Home Screen & Ad Buttons --- */
+.home-screen {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-dark);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+  transition: opacity 0.3s;
+}
+.home-screen.hidden { opacity: 0; pointer-events: none; }
+.home-title { color: #fff; font-size: 32px; font-weight: 900; margin-bottom: 30px; }
+.level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 16px; width: 100%; max-width: 400px; }
+.level-btn { aspect-ratio: 1; border-radius: 16px; border: 2px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.1); color: #fff; font-size: 20px; font-weight: 800; cursor: pointer; transition: 0.2s; }
+.level-btn.unlocked { background: linear-gradient(135deg, #a855f7, #ec4899); border-color: #fff; box-shadow: 0 4px 12px rgba(168,85,247,0.4); }
+.level-btn:active { transform: scale(0.9); }
+.level-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.home-stats { display: flex; gap: 16px; margin-bottom: 40px; }
+.btn-secondary { width: 100%; margin-top: 12px; padding: 16px; background: linear-gradient(135deg, #FF3366, #FF6B35); border: 2.5px solid rgba(255, 255, 255, 0.3); border-radius: 50px; color: #fff; font-family: var(--font-main); font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: var(--btn-shadow); transition: 0.2s; }
+.btn-secondary:active { transform: scale(0.96); }
+

@@ -13,11 +13,18 @@ import {
   GRID_SIZE,
   CELL_SIZE
 } from './gameLogic.js';
+import {
+  loadGameState,
+  addCoins,
+  spendCoins,
+  unlockLevel,
+  getMaxLevel,
+  getCoins
+} from './storage.js';
 
 // ─── Game State ───
 let currentLevel = 1;
 let score = 0;
-let coins = 150;
 let adBonusSlots = 0;
 
 let boardingLane = [];    // buses docked at station
@@ -52,6 +59,7 @@ function initUI() {
   const app = document.getElementById('app');
   app.innerHTML = `
     <header class="game-header">
+      <button class="icon-btn-round" id="btnHome" title="Home Screen">🏠</button>
       <button class="icon-btn-round" id="btnTopRestart" title="Restart Level">🔄</button>
       <div class="level-pill" id="levelDisplay">Level 1</div>
       <div class="stats-group">
@@ -99,7 +107,16 @@ function initUI() {
         <h2 class="modal-title" id="modalTitle">LEVEL CLEARED!</h2>
         <p class="modal-sub" id="modalSubtitle">Great job sorting traffic!</p>
         <button class="btn-primary" id="modalBtn">NEXT LEVEL</button>
+        <button class="btn-secondary hidden" id="modalAdBtn">🎬 WATCH AD (2x COINS)</button>
       </div>
+    </div>
+
+    <div class="home-screen hidden" id="homeScreen">
+      <h1 class="home-title">BUS FEVER</h1>
+      <div class="home-stats">
+        <div class="stat-pill coin-pill">🪙 <span id="homeCoinsDisplay">150</span></div>
+      </div>
+      <div class="level-grid" id="levelGrid"></div>
     </div>
   `;
 
@@ -108,19 +125,46 @@ function initUI() {
   container.addEventListener('pointerdown', handlePointerDown);
 
   document.getElementById('btnTopRestart').addEventListener('click', () => startLevel(currentLevel));
+  document.getElementById('btnHome').addEventListener('click', showHomeScreen);
   document.getElementById('btnShuffle').addEventListener('click', handleShuffleQueue);
   document.getElementById('btnVIP').addEventListener('click', handleVIPClear);
   document.getElementById('btnAutoClear').addEventListener('click', handleAutoClear);
   document.getElementById('modalBtn').addEventListener('click', handleModalBtnClick);
+  document.getElementById('modalAdBtn').addEventListener('click', handleModalAdClick);
   document.getElementById('btnVideoDock').addEventListener('click', handleVideoDockUnlock);
   document.getElementById('btnCoinDock').addEventListener('click', handleCoinDockUnlock);
 
-  startLevel(1);
+  showHomeScreen();
   animate();
+}
+
+function showHomeScreen() {
+  document.getElementById('homeScreen').classList.remove('hidden');
+  document.getElementById('homeCoinsDisplay').textContent = getCoins();
+  const levelGrid = document.getElementById('levelGrid');
+  levelGrid.innerHTML = '';
+  
+  const maxLvl = getMaxLevel();
+  // Show up to maxLevel + 1 or 20, whichever is larger, just to have a grid
+  const displayLevels = Math.max(20, maxLvl + 1);
+  
+  for (let i = 1; i <= displayLevels; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'level-btn';
+    btn.textContent = i;
+    if (i <= maxLvl) {
+      btn.classList.add('unlocked');
+      btn.addEventListener('click', () => startLevel(i));
+    } else {
+      btn.disabled = true;
+    }
+    levelGrid.appendChild(btn);
+  }
 }
 
 // ─── Level Setup ───
 function startLevel(lvl) {
+  document.getElementById('homeScreen').classList.add('hidden');
   currentLevel = lvl;
   document.getElementById('levelDisplay').textContent = `Level ${currentLevel}`;
   document.getElementById('gameModal').classList.remove('active');
@@ -310,12 +354,13 @@ function handleVideoDockUnlock() {
 }
 
 function handleCoinDockUnlock() {
-  sounds.init();
-  if (coinDocks >= COIN_DOCKS_MAX || coins < COIN_DOCK_COST) return;
-  coins -= COIN_DOCK_COST;
-  coinDocks = COIN_DOCKS_MAX;
-  sounds.playBooster();
-  renderUI();
+  if (coinDocks >= COIN_DOCKS_MAX || getCoins() < COIN_DOCK_COST) return;
+  if (spendCoins(COIN_DOCK_COST)) {
+    coinDocks++;
+    realignDockedBuses3D();
+    renderUI();
+    triggerBoarding();
+  }
 }
 
 function onBusClicked(bus) {
@@ -562,8 +607,8 @@ function realignDockedBuses3D() {
 // ─── Boosters ───
 function handleShuffleQueue() {
   sounds.init();
-  if (coins < 20 || activeLine.length <= 1) return;
-  coins -= 20;
+  if (getCoins() < 20 || activeLine.length <= 1) return;
+  if (!spendCoins(20)) return;
   sounds.playBooster();
 
   // Shuffle only the active line
@@ -579,8 +624,8 @@ function handleShuffleQueue() {
 
 function handleVIPClear() {
   sounds.init();
-  if (coins < 30 || boardingLane.length === 0) return;
-  coins -= 30;
+  if (getCoins() < 30 || boardingLane.length === 0) return;
+  if (!spendCoins(30)) return;
   sounds.playBooster();
 
   const targetBus = boardingLane[0];
@@ -597,11 +642,11 @@ function handleVIPClear() {
 
 function handleAutoClear() {
   sounds.init();
-  if (coins < 40) return;
+  if (getCoins() < 40) return;
 
   const clickableBus = gridBuses.find(b => b.state === 'GRID' && canBusExitGrid(b, gridBuses));
   if (clickableBus) {
-    coins -= 40;
+    if (!spendCoins(40)) return;
     sounds.playBooster();
     moveBusToStation3D(clickableBus);
   }
@@ -612,11 +657,14 @@ function triggerWin() {
   sounds.playWin();
   confetti({ particleCount: 180, spread: 100, origin: { y: 0.5 } });
 
+  unlockLevel(currentLevel + 1);
+
   document.getElementById('modalIcon').textContent = '🏆';
   document.getElementById('modalTitle').textContent = 'LEVEL CLEARED!';
-  document.getElementById('modalSubtitle').textContent = `Level ${currentLevel} Complete! +30 Coins!`;
+  document.getElementById('modalSubtitle').textContent = `Level ${currentLevel} Complete! +50 Coins!`;
   document.getElementById('modalBtn').textContent = 'NEXT LEVEL';
-  coins += 30;
+  document.getElementById('modalAdBtn').classList.remove('hidden');
+  addCoins(50);
   document.getElementById('gameModal').classList.add('active');
 }
 
@@ -626,10 +674,12 @@ function triggerGameOver() {
   document.getElementById('modalTitle').textContent = 'TRAFFIC JAMMED!';
   document.getElementById('modalSubtitle').textContent = 'All docks full — no matching passengers can board!';
   document.getElementById('modalBtn').textContent = 'TRY AGAIN';
+  document.getElementById('modalAdBtn').classList.add('hidden');
   document.getElementById('gameModal').classList.add('active');
 }
 
 function handleModalBtnClick() {
+  document.getElementById('modalAdBtn').classList.add('hidden');
   const modalBtn = document.getElementById('modalBtn');
   if (modalBtn.textContent === 'NEXT LEVEL') {
     startLevel(currentLevel + 1);
@@ -638,9 +688,27 @@ function handleModalBtnClick() {
   }
 }
 
+function handleModalAdClick() {
+  // Simulate an ad watch
+  const adBtn = document.getElementById('modalAdBtn');
+  adBtn.textContent = "Loading Ad...";
+  adBtn.disabled = true;
+  
+  setTimeout(() => {
+    addCoins(50); // double the coins (+50)
+    document.getElementById('modalSubtitle').textContent = `Level ${currentLevel} Complete! +100 Coins!`;
+    adBtn.textContent = "REWARD GRANTED!";
+    renderUI();
+  }, 1500);
+}
+
 // ─── UI Render ───
 function renderUI() {
-  document.getElementById('coinsDisplay').textContent = coins;
+  const coinsDisplay = getCoins();
+  document.getElementById('coinsDisplay').textContent = coinsDisplay;
+  const homeDisplay = document.getElementById('homeCoinsDisplay');
+  if (homeDisplay) homeDisplay.textContent = coinsDisplay;
+
   const totalSlots = getTotalActiveSlots();
   const totalP = getTotalPassengers();
   document.getElementById('dockCapacityLabel').textContent =
@@ -656,7 +724,7 @@ function renderUI() {
   }
   const btnCoinDock = document.getElementById('btnCoinDock');
   if (btnCoinDock) {
-    btnCoinDock.disabled = coinDocks >= COIN_DOCKS_MAX || coins < COIN_DOCK_COST;
+    btnCoinDock.disabled = coinDocks >= COIN_DOCKS_MAX || coinsDisplay < COIN_DOCK_COST;
   }
 }
 
