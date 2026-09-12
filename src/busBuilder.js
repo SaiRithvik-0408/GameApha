@@ -88,11 +88,12 @@ function createRoundedBoxGeo(width, height, depth, radius = 0.15) {
 export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2, maxCapacity = 3) {
   const group = new THREE.Group();
 
-  const width = 1.55;
+  // The long side of the bus must be along the Z axis
+  const width = 1.44;
   const height = 1.15;
-  const depth = length * 1.7;
+  const depth = length * 1.9;
 
-  const hexColor = BUS_COLORS[colorKey] || 0x3b82f6;
+  const hexColor = BUS_COLORS[colorKey] || (typeof colorKey === 'string' && colorKey.startsWith('#') ? parseInt(colorKey.replace('#', '0x')) : 0x3b82f6);
   const darkerHex = darkenColor(hexColor, 0.7);
   const lighterHex = lightenColor(hexColor, 1.25);
 
@@ -316,14 +317,21 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2, max
     capacityGroup.add(dot);
     dots.push(dot);
   }
+  
+  // Explicit text label for capacity
+  const textSprite = createTextSprite(`0/${maxCapacity}`);
+  textSprite.position.set(0, 0.6, 0);
+  capacityGroup.add(textSprite);
+  
   group.add(capacityGroup);
 
   // Apply Direction Rotation so arrow and headlights point in exact movement direction
+  // Since the base geometry front is at -Z, we rotate accordingly:
   let rotationY = 0;
-  if (direction === 'UP') rotationY = 0;                  // Point forward towards negative Z (UP)
-  else if (direction === 'DOWN') rotationY = Math.PI;     // Point forward towards positive Z (DOWN)
-  else if (direction === 'LEFT') rotationY = Math.PI / 2;  // Point forward towards negative X (LEFT)
-  else if (direction === 'RIGHT') rotationY = -Math.PI / 2; // Point forward towards positive X (RIGHT)
+  if (direction === 'UP') rotationY = 0;                  // Front (-Z) faces -Z
+  else if (direction === 'DOWN') rotationY = Math.PI;     // Front (-Z) faces +Z
+  else if (direction === 'LEFT') rotationY = Math.PI / 2;  // Front (-Z) faces -X
+  else if (direction === 'RIGHT') rotationY = -Math.PI / 2; // Front (-Z) faces +X
 
   group.rotation.y = rotationY;
 
@@ -338,11 +346,21 @@ export function createBus3D(colorKey = 'blue', direction = 'UP', length = 2, max
     emptyDotMat,
     filledDotMat,
     bodyMesh,
+    textSprite,
     updateCapacity: (count) => {
       dots.forEach((dot, idx) => {
         dot.material = idx < count ? filledDotMat : emptyDotMat;
         dot.scale.setScalar(idx < count ? 1.3 : 1.0);
       });
+      
+      if (textSprite && textSprite.material && textSprite.material.map) {
+        const canvas = textSprite.material.map.image;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeText(`${count}/${maxCapacity}`, 128, 64);
+        ctx.fillText(`${count}/${maxCapacity}`, 128, 64);
+        textSprite.material.map.needsUpdate = true;
+      }
     }
   };
 
@@ -363,3 +381,24 @@ function lightenColor(hex, factor) {
   const b = Math.min(255, (hex & 0xff) * factor);
   return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
 }
+
+function createTextSprite(message) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 256;
+  canvas.height = 128;
+  ctx.font = 'bold 80px Arial';
+  ctx.fillStyle = 'white';
+  ctx.strokeStyle = 'black';
+  ctx.lineWidth = 8;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.strokeText(message, 128, 64);
+  ctx.fillText(message, 128, 64);
+  const texture = new THREE.CanvasTexture(canvas);
+  const spriteMaterial = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+  const sprite = new THREE.Sprite(spriteMaterial);
+  sprite.scale.set(1.5, 0.75, 1);
+  return sprite;
+}
+

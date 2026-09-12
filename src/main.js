@@ -50,7 +50,7 @@ function getTotalActiveSlots() {
 }
 
 function getDockWorldPos(slotIndex, totalSlots) {
-  const startX = -4.8;
+  const startX = -4.0;
   const stepX = 1.6;
   return { x: startX + slotIndex * stepX, y: 0.15, z: -4.5 };
 }
@@ -73,15 +73,7 @@ function initUI() {
       <div class="dock-badge-bar" id="dockCapacityLabel">4 Active Docks</div>
     </div>
 
-    <!-- Unlock Dock Panel -->
-    <div class="pick-panel" id="dockPanel">
-      <div class="pick-info">
-        <span class="pick-label">🅿️ Docks:</span>
-        <span class="pick-count" id="dockCount">3/6</span>
-      </div>
-      <button class="pick-btn video-btn" id="btnVideoDock">🎬 +2 Free</button>
-      <button class="pick-btn coin-btn" id="btnCoinDock">🪙 +1 (25)</button>
-    </div>
+    <!-- Removed old dock unlock panel -->
 
     <footer class="booster-bar">
       <button class="booster-card" id="btnVIP">
@@ -131,8 +123,6 @@ function initUI() {
   document.getElementById('btnAutoClear').addEventListener('click', handleAutoClear);
   document.getElementById('modalBtn').addEventListener('click', handleModalBtnClick);
   document.getElementById('modalAdBtn').addEventListener('click', handleModalAdClick);
-  document.getElementById('btnVideoDock').addEventListener('click', handleVideoDockUnlock);
-  document.getElementById('btnCoinDock').addEventListener('click', handleCoinDockUnlock);
 
   showHomeScreen();
   animate();
@@ -176,9 +166,9 @@ function startLevel(lvl) {
   boardingLane = [];
   isBoardingInProgress = false;
 
-  // Reset dock charges each level
-  videoDocks = 0;
-  coinDocks = 0;
+  // Restore lock sprites for any docks that are still locked
+  // (already-unlocked docks stay unlocked across levels)
+  if (sceneManager) sceneManager.refreshLockSprites(videoDocks, coinDocks);
 
   const levelData = generateSolvableLevel(currentLevel);
   gridBuses = levelData.buses;
@@ -272,6 +262,23 @@ function handlePointerDown(event) {
   sceneManager.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   sceneManager.raycaster.setFromCamera(sceneManager.mouse, sceneManager.camera);
 
+  // 0. Check if a lock sprite was clicked
+  if (sceneManager.lockSprites && sceneManager.lockSprites.length > 0) {
+    const lockHits = sceneManager.raycaster.intersectObjects(sceneManager.lockSprites, false);
+    if (lockHits.length > 0) {
+      const hit = lockHits[0].object;
+      if (hit.userData && hit.userData.isLock) {
+        const idx = hit.userData.slotIndex;
+        if (idx === 3 || idx === 4) {
+          handleVideoDockUnlock();
+        } else if (idx === 5) {
+          handleCoinDockUnlock();
+        }
+        return;
+      }
+    }
+  }
+
   // 1. Check if a waiting line passenger was clicked
   if (waitingLine3DQueue.length > 0) {
     const waitingChildren = [];
@@ -347,20 +354,79 @@ function pickFromWaitingLine(waitIdx) {
 function handleVideoDockUnlock() {
   sounds.init();
   if (videoDocks >= VIDEO_DOCKS_MAX) return;
-  // Simulate watching a video ad (instant unlock)
-  videoDocks = VIDEO_DOCKS_MAX;
-  sounds.playBooster();
-  renderUI();
+  
+  const remainingAds = VIDEO_DOCKS_MAX - videoDocks;
+  const modal = document.getElementById('gameModal');
+  document.getElementById('modalIcon').textContent = '🎬';
+  document.getElementById('modalTitle').textContent = 'UNLOCK DOCK';
+  document.getElementById('modalSubtitle').textContent =
+    `Watch a short ad to unlock 1 extra dock! (${remainingAds} ad${remainingAds > 1 ? 's' : ''} remaining)`;
+  
+  const primaryBtn = document.getElementById('modalBtn');
+  primaryBtn.textContent = 'WATCH AD';
+  primaryBtn.onclick = () => {
+    modal.classList.remove('active');
+    // Simulate ad viewing — unlock exactly 1 dock
+    setTimeout(() => {
+      const newSlotIndex = 3 + videoDocks; // slot 3 first, then slot 4
+      videoDocks++;
+      sounds.playBooster();
+      
+      // Remove the lock sprite for only the newly-unlocked dock
+      if (sceneManager && sceneManager.lockSprites) {
+        sceneManager.lockSprites = sceneManager.lockSprites.filter(sprite => {
+          if (sprite.userData.slotIndex === newSlotIndex) {
+            sceneManager.scene.remove(sprite);
+            return false;
+          }
+          return true;
+        });
+      }
+      
+      realignDockedBuses3D();
+      renderUI();
+      triggerBoarding();
+    }, 1000);
+  };
+  
+  document.getElementById('modalAdBtn').classList.add('hidden');
+  modal.classList.add('active');
 }
 
 function handleCoinDockUnlock() {
   if (coinDocks >= COIN_DOCKS_MAX || getCoins() < COIN_DOCK_COST) return;
-  if (spendCoins(COIN_DOCK_COST)) {
-    coinDocks++;
-    realignDockedBuses3D();
-    renderUI();
-    triggerBoarding();
-  }
+  
+  const modal = document.getElementById('gameModal');
+  document.getElementById('modalIcon').textContent = '🪙';
+  document.getElementById('modalTitle').textContent = 'UNLOCK DOCK';
+  document.getElementById('modalSubtitle').textContent = `Pay ${COIN_DOCK_COST} coins to unlock an extra dock!`;
+  
+  const primaryBtn = document.getElementById('modalBtn');
+  primaryBtn.textContent = 'PAY COINS';
+  primaryBtn.onclick = () => {
+    modal.classList.remove('active');
+    if (spendCoins(COIN_DOCK_COST)) {
+      coinDocks++;
+      
+      // Remove lock sprite for coin dock
+      if (sceneManager && sceneManager.lockSprites) {
+        sceneManager.lockSprites = sceneManager.lockSprites.filter(sprite => {
+          if (sprite.userData.slotIndex === 5) {
+            sceneManager.scene.remove(sprite);
+            return false;
+          }
+          return true;
+        });
+      }
+      
+      realignDockedBuses3D();
+      renderUI();
+      triggerBoarding();
+    }
+  };
+  
+  document.getElementById('modalAdBtn').classList.add('hidden');
+  modal.classList.add('active');
 }
 
 function onBusClicked(bus) {
@@ -434,6 +500,7 @@ function moveBusToStation3D(bus) {
     duration: 0.4, ease: 'power2.out',
     onComplete: () => {
       bus.state = 'STATION';
+      realignDockedBuses3D();
       renderUI();
       triggerBoarding();
     }
@@ -471,7 +538,7 @@ function processBoarding() {
   for (let i = 0; i < activeLine.length; i++) {
     const color = activeLine[i];
     const bus = boardingLane.find(
-      b => b.color === color && b.passengersCount < b.maxCapacity && b.state === 'STATION'
+      b => b.color === color && b.passengersCount < (b.maxCapacity || 3) && b.state === 'STATION'
     );
     if (bus) {
       matchIndex = i;
@@ -490,11 +557,11 @@ function processBoarding() {
     animatePassengerBoarding3D(boardedColor, matchBus, matchIndex);
 
     // Check if bus is full
-    if (matchBus.passengersCount >= matchBus.maxCapacity) {
+    if (matchBus.passengersCount >= (matchBus.maxCapacity || 3)) {
       matchBus.state = 'EXITING';
       sounds.playBusFull();
       score += 50;
-      coins += 5;
+      addCoins(5); // award 5 coins per bus completed
       setTimeout(() => animateBusExit3D(matchBus), 400);
     }
 
@@ -519,7 +586,7 @@ function checkGameOverState() {
   const totalP = getTotalPassengers();
   if (totalP > 0 && boardingLane.length >= activeSlots) {
     const canAnyMatch = activeLine.some(color =>
-      boardingLane.some(b => b.color === color && b.passengersCount < b.maxCapacity && b.state === 'STATION')
+      boardingLane.some(b => b.color === color && b.passengersCount < (b.maxCapacity || 3) && b.state === 'STATION')
     );
     const canAnyBusExit = gridBuses.some(b => b.state === 'GRID' && canBusExitGrid(b, gridBuses));
 
@@ -593,13 +660,16 @@ function animateBusExit3D(bus) {
 function realignDockedBuses3D() {
   const totalSlots = getTotalActiveSlots();
   boardingLane.forEach((bus, idx) => {
-    const busMesh = bus3DMap.get(bus.id);
-    if (busMesh) {
-      const dockPos = getDockWorldPos(idx, totalSlots);
-      gsap.to(busMesh.position, {
-        x: dockPos.x, y: dockPos.y, z: dockPos.z,
-        duration: 0.3
-      });
+    // Only realign buses already settled at station — skip buses currently driving/animating
+    if (bus.state === 'STATION') {
+      const busMesh = bus3DMap.get(bus.id);
+      if (busMesh) {
+        const dockPos = getDockWorldPos(idx, totalSlots);
+        gsap.to(busMesh.position, {
+          x: dockPos.x, y: dockPos.y, z: dockPos.z,
+          duration: 0.3
+        });
+      }
     }
   });
 }
@@ -629,7 +699,7 @@ function handleVIPClear() {
   sounds.playBooster();
 
   const targetBus = boardingLane[0];
-  targetBus.passengersCount = targetBus.maxCapacity;
+  targetBus.passengersCount = targetBus.maxCapacity || 3;
   targetBus.state = 'EXITING';
 
   const busMesh = bus3DMap.get(targetBus.id);
@@ -712,19 +782,30 @@ function renderUI() {
   const totalSlots = getTotalActiveSlots();
   const totalP = getTotalPassengers();
   document.getElementById('dockCapacityLabel').textContent =
-    `${totalSlots} Docks · ${totalP} Passengers · Waiting: ${waitingLine.length}`;
+    `${totalSlots}/6 Docks Active · ${activeLine.length} Passengers · Waiting: ${waitingLine.length}`;
+
+  const adBtn = document.getElementById('adDockBtn');
+  if (adBtn) {
+    if (videoDocks >= 2) {
+      adBtn.style.display = 'none';
+    } else {
+      adBtn.style.display = 'flex';
+      adBtn.innerHTML = `<span class="icon">▶️</span> +1 Dock (Ad) [${2 - videoDocks} left]`;
+    }
+  }
+
+  const coinBtn = document.getElementById('coinDockBtn');
+  if (coinBtn) {
+    if (coinDocks >= 1) {
+      coinBtn.style.display = 'none';
+    } else {
+      coinBtn.style.display = 'flex';
+    }
+  }
 
   const dockCountEl = document.getElementById('dockCount');
   if (dockCountEl) {
     dockCountEl.textContent = `${totalSlots}/6`;
-  }
-  const btnVideoDock = document.getElementById('btnVideoDock');
-  if (btnVideoDock) {
-    btnVideoDock.disabled = videoDocks >= VIDEO_DOCKS_MAX;
-  }
-  const btnCoinDock = document.getElementById('btnCoinDock');
-  if (btnCoinDock) {
-    btnCoinDock.disabled = coinDocks >= COIN_DOCKS_MAX || coinsDisplay < COIN_DOCK_COST;
   }
 }
 

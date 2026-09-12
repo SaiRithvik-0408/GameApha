@@ -458,3 +458,20 @@ body {
 .btn-secondary { width: 100%; margin-top: 12px; padding: 16px; background: linear-gradient(135deg, #FF3366, #FF6B35); border: 2.5px solid rgba(255, 255, 255, 0.3); border-radius: 50px; color: #fff; font-family: var(--font-main); font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: var(--btn-shadow); transition: 0.2s; }
 .btn-secondary:active { transform: scale(0.96); }
 
+
+@media (max-width: 600px) {
+  .game-header { padding: 10px; gap: 8px; }
+  .icon-btn-round { width: 36px; height: 36px; font-size: 16px; }
+  .level-pill, .stat-pill { padding: 6px 14px; font-size: 14px; }
+  .ui-overlay { top: 70px; }
+  .dock-badge-bar { padding: 4px 16px; font-size: 11px; }
+  .pick-panel { left: 10px; top: 100px; padding: 10px; gap: 6px; }
+  .pick-info { font-size: 14px; }
+  .pick-btn { padding: 8px 10px; font-size: 11px; }
+  .booster-bar { bottom: 10px; height: 70px; gap: 6px; }
+  .booster-card { max-width: 80px; padding: 6px; }
+  .booster-icon-wrap { font-size: 20px; }
+  .booster-label { font-size: 10px; }
+  .booster-cost { font-size: 9px; }
+}
+
